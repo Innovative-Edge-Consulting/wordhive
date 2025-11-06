@@ -31,3 +31,24 @@ button {
 }
 button:active { transform: translateY(1px); }
 
+/* Wordscend grid (starter) */
+:root { --tileSize: clamp(42px, min(9.5vw, (100vw - 64px)/7), 56px); }
+
+.ws-grid { display: grid; gap: 8px; }
+.ws-row {
+  display: grid;
+  grid-template-columns: repeat(5, var(--tileSize));
+  gap: 8px;
+}
+.ws-tile {
+  width: var(--tileSize);
+  height: var(--tileSize);
+  border: 1px solid var(--border, #333);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #0f1214;
+  color: var(--text, #fff);
+}
