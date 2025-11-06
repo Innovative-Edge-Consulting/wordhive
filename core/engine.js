@@ -5,24 +5,20 @@
   }
 
   function evaluateGuess(guess, answer) {
-    // Classic Wordle evaluation with letter counts to handle duplicates
     const res = Array(guess.length).fill('absent');
     const a = answer.split('');
     const g = guess.split('');
-
-    // Count answer letters
     const counts = {};
     for (const ch of a) counts[ch] = (counts[ch] || 0) + 1;
 
-    // First pass: correct
+    // correct
     for (let i = 0; i < g.length; i++) {
       if (g[i] === a[i]) {
         res[i] = 'correct';
         counts[g[i]] -= 1;
       }
     }
-
-    // Second pass: present
+    // present
     for (let i = 0; i < g.length; i++) {
       if (res[i] === 'correct') continue;
       const ch = g[i];
@@ -34,7 +30,6 @@
     return res;
   }
 
-  // precedence for keyboard coloring
   const KEY_RANK = { absent: 0, present: 1, correct: 2 };
 
   const Engine = {
@@ -45,7 +40,7 @@
       this.board = createEmptyBoard(this.rows, this.cols);
       this.currentRow = 0;
       this.currentCol = 0;
-      this.answer = 'CRANE'; // TEMP: dictionary/answer-of-the-day coming next
+      this.answer = 'CRANE'; // TEMP; dictionary/rotating answer coming next
       this.rowMarks = Array.from({ length: this.rows }, () => Array(this.cols).fill(null));
       this.keyStatus = {}; // { A: 'absent'|'present'|'correct' }
       this.done = false;
@@ -53,17 +48,17 @@
       return this.getConfig();
     },
 
-    getConfig() { return { rows: this.rows, cols: this.cols }; },
-    getBoard() { return this.board; },
-    getCursor() { return { row: this.currentRow, col: this.currentCol }; },
-    getRowMarks() { return this.rowMarks; },
-    getKeyStatus() { return this.keyStatus; },
-    isDone() { return this.done; },
-    didWin() { return this.win; },
+    getConfig(){ return { rows:this.rows, cols:this.cols }; },
+    getBoard(){ return this.board; },
+    getCursor(){ return { row:this.currentRow, col:this.currentCol }; },
+    getRowMarks(){ return this.rowMarks; },
+    getKeyStatus(){ return this.keyStatus; },
+    isDone(){ return this.done; },
+    didWin(){ return this.win; },
 
-    canType() { return !this.done && this.currentRow < this.rows; },
+    canType(){ return !this.done && this.currentRow < this.rows; },
 
-    addLetter(ch) {
+    addLetter(ch){
       if (!this.canType()) return false;
       if (this.currentCol >= this.cols) return false;
       if (!/^[A-Za-z]$/.test(ch)) return false;
@@ -72,7 +67,7 @@
       return true;
     },
 
-    backspace() {
+    backspace(){
       if (!this.canType()) return false;
       if (this.currentCol === 0) return false;
       this.currentCol -= 1;
@@ -80,50 +75,44 @@
       return true;
     },
 
-    rowComplete() {
+    rowComplete(){
       return this.board[this.currentRow].every((c) => c && c.length === 1);
     },
 
-    submitRow() {
-      if (this.done) return { ok: false, reason: 'done' };
-      if (!this.rowComplete()) return { ok: false, reason: 'incomplete' };
+    submitRow(){
+      if (this.done) return { ok:false, reason:'done' };
+      if (!this.rowComplete()) return { ok:false, reason:'incomplete' };
 
       const guess = this.board[this.currentRow].join('');
       const marks = evaluateGuess(guess, this.answer);
-
-      // save marks for this row
       this.rowMarks[this.currentRow] = marks.slice();
 
-      // update keyboard color precedence
+      // keyboard precedence
       for (let i = 0; i < guess.length; i++) {
         const ch = guess[i];
         const m = marks[i];
-        const prev = this.keyStatus[ch] || 'absent';
+        const prev = this.keyStatus[ch] ?? 'absent';
         if (KEY_RANK[m] > KEY_RANK[prev]) this.keyStatus[ch] = m;
         else if (!(ch in this.keyStatus)) this.keyStatus[ch] = m;
       }
 
       if (guess === this.answer) {
-        this.done = true;
-        this.win = true;
-        return { ok: true, guess, marks, win: true, done: true };
+        this.done = true; this.win = true;
+        return { ok:true, guess, marks, win:true, done:true };
       }
 
       this.currentRow += 1;
       this.currentCol = 0;
 
       if (this.currentRow >= this.rows) {
-        this.done = true;
-        this.win = false;
-        return { ok: true, guess, marks, win: false, done: true };
+        this.done = true; this.win = false;
+        return { ok:true, guess, marks, win:false, done:true };
       }
-
-      return { ok: true, guess, marks, win: false, done: false };
+      return { ok:true, guess, marks, win:false, done:false };
     }
   };
 
   Engine.init();
-
   global.WordscendEngine = Engine;
   console.log('[Wordscend] Engine ready:', Engine.getConfig());
 })(window);
