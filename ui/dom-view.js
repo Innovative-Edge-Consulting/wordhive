@@ -12,22 +12,33 @@
       this.root = rootEl;
       this.config = config;
 
-      // Build containers fresh
+      // Build stage
       this.root.innerHTML = `
+        <div class="ws-hud">
+          <div class="ws-tag" id="ws-level">Level: -</div>
+          <div class="ws-tag" id="ws-score">Score: 0</div>
+        </div>
         <div class="ws-grid" aria-label="Game grid"></div>
         <div class="ws-kb" aria-label="On-screen keyboard"></div>
-        <div class="ws-msg" role="status" aria-live="polite"></div>
+        <div class="ws-bubble" id="ws-bubble"></div>
       `;
 
-      this.gridEl = this.root.querySelector('.ws-grid');
-      this.kbEl   = this.root.querySelector('.ws-kb');
-      this.msgEl  = this.root.querySelector('.ws-msg');
+      this.levelEl = this.root.querySelector('#ws-level');
+      this.scoreEl = this.root.querySelector('#ws-score');
+      this.gridEl  = this.root.querySelector('.ws-grid');
+      this.kbEl    = this.root.querySelector('.ws-kb');
+      this.bubble  = this.root.querySelector('#ws-bubble');
 
       this.renderGrid();
       this.renderKeyboard();
       this.bindKeyboard();
 
       console.log('[Wordscend] UI mounted:', config.rows, 'rows ×', config.cols);
+    },
+
+    setHUD(levelText, score){
+      if (this.levelEl) this.levelEl.textContent = levelText;
+      if (this.scoreEl) this.scoreEl.textContent = `Score: ${score}`;
     },
 
     /* ---------- Rendering ---------- */
@@ -41,10 +52,8 @@
       for (let r = 0; r < board.length; r++) {
         const rowEl = document.createElement('div');
         rowEl.className = 'ws-row';
-
         const row = board[r];
 
-        // Ensure correct number of columns visually (no CSS dependency on "5")
         rowEl.style.gridTemplateColumns = `repeat(${row.length}, var(--tileSize))`;
 
         for (let c = 0; c < row.length; c++) {
@@ -53,7 +62,6 @@
           const ch = row[c] || '';
           tile.textContent = ch;
 
-          // Apply submitted state colors
           const mark = marks[r]?.[c];
           if (mark) tile.classList.add('state-' + mark);
 
@@ -61,7 +69,6 @@
           if (r === cursor.row && c === cursor.col && !global.WordscendEngine.isDone()) {
             tile.classList.add('active');
           }
-
           tile.dataset.row = r;
           tile.dataset.col = c;
           rowEl.appendChild(tile);
@@ -141,26 +148,58 @@
         const res = global.WordscendEngine.submitRow();
         if (!res.ok && res.reason === 'incomplete') {
           this.shakeCurrentRow();
-          this.toast('Not enough letters');
+          this.showBubble('Not enough letters');
           return;
         }
         if (!res.ok && res.reason === 'invalid') {
           this.shakeCurrentRow();
-          this.toast('Not in word list');
+          this.showBubble('Not in word list');
           return;
         }
-        this.renderGrid();
+
+        // Flip animation on the submitted row
+        this.flipRevealRow(res.attempt - 1, res.marks);
+
+        // re-render keyboard now (grid will update when flip finishes)
         this.renderKeyboard();
 
         if (res.done) {
-          if (res.win) this.toast('Nice! You got it.');
-          else this.toast('Out of tries.');
+          // Grid final re-render after flips
+          setTimeout(() => this.renderGrid(), 420 + (this.config.cols - 1) * 80);
+
+          if (res.win) this.showBubble('Nice! You got it.');
+          else this.showBubble('Out of tries.');
         }
         return;
       }
     },
 
-    /* ---------- UI helpers ---------- */
+    /* ---------- Animations & Helpers ---------- */
+    flipRevealRow(rowIndex, marks) {
+      const rows = this.gridEl.querySelectorAll('.ws-row');
+      const rowEl = rows[rowIndex];
+      if (!rowEl) return;
+
+      const tiles = Array.from(rowEl.querySelectorAll('.ws-tile'));
+      tiles.forEach((tile, i) => {
+        const delay = i * 80; // stagger
+        tile.style.setProperty('--flip-delay', `${delay}ms`);
+        tile.classList.add('flip');
+
+        // When half flip passes, swap to state class
+        setTimeout(() => {
+          const mark = marks[i];
+          if (mark) {
+            tile.classList.remove('state-correct','state-present','state-absent');
+            tile.classList.add('state-' + mark);
+          }
+        }, delay + 210); // mid-flip
+      });
+
+      // After flips complete, re-render to lock the row visually
+      setTimeout(() => this.renderGrid(), 420 + (tiles.length - 1) * 80);
+    },
+
     shakeCurrentRow() {
       const cursor = global.WordscendEngine.getCursor();
       const rows = this.gridEl.querySelectorAll('.ws-row');
@@ -172,12 +211,12 @@
       setTimeout(() => rowEl.classList.remove('shake'), 400);
     },
 
-    toast(msg) {
-      if (!this.msgEl) return;
-      this.msgEl.textContent = msg;
-      this.msgEl.classList.add('show');
-      clearTimeout(this._msgT);
-      this._msgT = setTimeout(() => this.msgEl.classList.remove('show'), 1400);
+    showBubble(msg) {
+      if (!this.bubble) return;
+      this.bubble.textContent = msg;
+      this.bubble.classList.add('show');
+      clearTimeout(this._bT);
+      this._bT = setTimeout(() => this.bubble.classList.remove('show'), 1400);
     }
   };
 
