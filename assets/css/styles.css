@@ -1,55 +1,101 @@
-/* ===== Grid colors (temporary palette) ===== */
+/* ===== Base theme ===== */
 :root{
+  --brand:#497f64;
+  --bg:#0d0f10;
+  --text:#ffffff;
+  --muted:#a5b3a8;
+  --border:#2a2d31;
+
+  /* tile sizing scales on mobile; JS doesn’t need to touch this */
+  --tileSize: clamp(42px, min(9.5vw, (100vw - 64px)/7), 56px);
+
   --correct:#2ea043; /* green */
   --present:#e3b341; /* yellow */
   --absent:#3a3f45;  /* gray */
 }
 
-/* existing .ws-grid/.ws-row/.ws-tile from earlier remain */
-
-.ws-tile.state-correct { background: var(--correct); border-color: var(--correct); color:#000; }
-.ws-tile.state-present { background: var(--present); border-color: var(--present); color:#000; }
-.ws-tile.state-absent  { background: var(--absent);  border-color: var(--absent);  color:#fff; }
-
-/* shake animation (already added earlier). Keep if present. */
-@keyframes ws-shake {
-  0%,100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  display:grid;
+  place-items:start center;
 }
-.ws-row.shake .ws-tile { animation: ws-shake 120ms linear 0s 2; }
+#game{
+  width:100%;
+  max-width:720px;
+  padding:24px 16px 32px;
+}
 
-/* ===== On-screen keyboard ===== */
-.ws-kb { margin-top: 16px; display: grid; gap: 8px; }
-.ws-kb-row { display: grid; grid-auto-flow: column; justify-content: center; gap: 6px; }
+/* ===== Grid ===== */
+.ws-grid{ display:grid; gap:8px; }
+.ws-row{
+  display:grid;
+  gap:8px;
+  /* NOTE: columns set inline by JS to match current word length */
+}
+.ws-tile{
+  width:var(--tileSize);
+  height:var(--tileSize);
+  border:1px solid var(--border);
+  border-radius:8px;
+  display:grid;
+  place-items:center;
+  font-weight:700;
+  text-transform:uppercase;
+  background:#0f1214;
+  color:var(--text);
+  user-select:none;
+  transition:transform .06s ease, background .15s ease, border-color .15s ease;
+}
+.ws-tile.active{ outline:2px solid var(--brand); outline-offset:-2px; }
+.ws-tile.filled{ background:#111419; border-color:#3a3f45; }
+.ws-row.ws-locked .ws-tile{ opacity:.9; }
 
+/* Submitted state colors */
+.ws-tile.state-correct{ background:var(--correct); border-color:var(--correct); color:#000; }
+.ws-tile.state-present{ background:var(--present); border-color:var(--present); color:#000; }
+.ws-tile.state-absent{  background:var(--absent);  border-color:var(--absent);  color:#fff; }
+
+/* Shake for errors */
+@keyframes ws-shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-4px)}
+  75%{transform:translateX(4px)}
+}
+.ws-row.shake .ws-tile{ animation:ws-shake 120ms linear 0s 2; }
+
+/* ===== Keyboard ===== */
+.ws-kb{ margin-top:16px; display:grid; gap:8px; }
+.ws-kb-row{ display:grid; grid-auto-flow:column; justify-content:center; gap:6px; }
 .ws-kb-key{
-  font: 600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-  padding: 12px 10px;
-  min-width: 34px;
-  border-radius: 8px;
-  border: 1px solid #2a2d31;
-  background: #12161a;
-  color: var(--text,#fff);
-  cursor: pointer;
-  user-select: none;
+  font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  padding:12px 10px;
+  min-width:34px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background:#12161a;
+  color:var(--text);
+  cursor:pointer;
+  user-select:none;
 }
-.ws-kb-key:active{ transform: translateY(1px); }
+.ws-kb-key:active{ transform:translateY(1px) }
+.ws-kb-enter{ padding:12px 14px }
+.ws-kb-back{  padding:12px 14px }
 
-.ws-kb-enter { padding: 12px 14px; }
-.ws-kb-back  { padding: 12px 14px; }
+/* Keyboard color states */
+.ws-kb-key.k-correct{ background:var(--correct); border-color:var(--correct); color:#000; }
+.ws-kb-key.k-present{ background:var(--present); border-color:var(--present); color:#000; }
+.ws-kb-key.k-absent{  background:var(--absent);  border-color:var(--absent);  color:#fff; }
 
-/* keyboard color states */
-.ws-kb-key.k-correct { background: var(--correct); border-color: var(--correct); color:#000; }
-.ws-kb-key.k-present { background: var(--present); border-color: var(--present); color:#000; }
-.ws-kb-key.k-absent  { background: var(--absent);  border-color: var(--absent);  color:#fff; }
-
-/* small toast/status */
+/* Toast/status */
 .ws-msg{
-  margin-top: 10px;
-  font-size: 14px;
-  color: var(--text,#fff);
-  opacity: 0;
-  transition: opacity .15s ease;
+  margin-top:10px;
+  font-size:14px;
+  color:var(--text);
+  opacity:0;
+  transition:opacity .15s ease;
 }
-.ws-msg.show{ opacity: 1; }
+.ws-msg.show{ opacity:1 }
