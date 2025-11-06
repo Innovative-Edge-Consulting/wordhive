@@ -27,7 +27,7 @@
       this.renderKeyboard();
       this.bindKeyboard();
 
-      console.log('[Wordscend] Grid rendered:', config.rows, 'rows ×', config.cols);
+      console.log('[Wordscend] UI mounted:', config.rows, 'rows ×', config.cols);
     },
 
     /* ---------- Rendering ---------- */
@@ -142,6 +142,11 @@
         if (!res.ok && res.reason === 'incomplete') {
           this.shakeCurrentRow();
           this.toast('Not enough letters');
+          return;
+        }
+        if (!res.ok && res.reason === 'invalid') {
+          this.shakeCurrentRow();
+          this.toast('Not in word list');
           return;
         }
         this.renderGrid();
