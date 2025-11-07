@@ -36,8 +36,9 @@ body{
 /* ===== HUD ===== */
 .ws-hud{
   width:100%;
-  display:grid;
-  grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
   gap:12px;
   max-width:560px;
 }
@@ -48,8 +49,8 @@ body{
   border-radius:10px;
   background:#111419;
   color:var(--text);
-  text-align:center;
 }
+.ws-hud-right{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 
 /* ===== Stage wrapper (bubble overlays grid) ===== */
 .ws-stage{
@@ -233,4 +234,10 @@ body{
   .ws-kb-row{ gap: 5px; }
   .ws-kb-key{ padding: 10px 8px; min-width: 30px; font-weight: 700; }
   .ws-endcard .card, .ws-intro .card { padding:16px; }
+}
+
+/* ===== HUD layout tweaks ===== */
+.ws-hud-right { gap:8px; }
+@media (max-width:430px){
+  .ws-hud-right { gap:6px; }
 }
