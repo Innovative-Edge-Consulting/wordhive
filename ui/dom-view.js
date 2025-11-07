@@ -12,8 +12,38 @@
       this.root = rootEl;
       this.config = config;
 
-      // Build structure (HUD: Level, Score, Streak)
+      // Topbar + HUD + Stage + Keyboard
       this.root.innerHTML = `
+        <div class="ws-topbar">
+          <div class="ws-topbar-inner">
+            <div class="ws-brand" role="banner" aria-label="Wordscend">
+              <span class="dot"></span> Wordscend
+            </div>
+
+            <nav class="ws-nav" aria-label="Site">
+              <div class="ws-menu" id="ws-menu">
+                <button class="menu-btn ws-btn" type="button" aria-haspopup="true" aria-expanded="false">
+                  More Games ▾
+                </button>
+                <div class="menu" role="menu" aria-label="More Games">
+                  <a href="https://leashfree.ca/games" role="menuitem">Games Hub</a>
+                  <a href="https://leashfree.ca/dog-name-finder" role="menuitem">Dog Name Finder</a>
+                  <a href="https://leashfree.ca/resources/dog-calorie-calculator" role="menuitem">Calorie Calculator</a>
+                </div>
+              </div>
+            </nav>
+
+            <div class="ws-actions">
+              <button class="icon-btn" id="ws-info" type="button" title="How to play" aria-label="How to play">
+                <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M12 8.5h.01M11 11.5h1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </button>
+              <button class="icon-btn" id="ws-settings" type="button" title="Settings" aria-label="Settings">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.5"/><path d="M19 12a7 7 0 0 0-.09-1.09l2.02-1.57-2-3.46-2.43.98a7.03 7.03 0 0 0-1.88-1.09l-.31-2.6h-4l-.31 2.6c-.67.25-1.3.61-1.88 1.09l-2.43-.98-2 3.46 2.02 1.57A7.1 7.1 0 0 0 5 12c0 .37.03.73.09 1.09l-2.02 1.57 2 3.46 2.43-.98c.58.48 1.21.84 1.88 1.09l.31 2.6h4l.31-2.6c.67-.25 1.3-.61 1.88-1.09l2.43.98 2-3.46-2.02-1.57c.06-.36.09-.72.09-1.09Z" stroke="currentColor" stroke-width="1.5"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div class="ws-hud">
           <div class="ws-tag" id="ws-level">Level: -</div>
           <div class="ws-hud-right">
@@ -30,6 +60,7 @@
         <div class="ws-kb" aria-label="On-screen keyboard"></div>
       `;
 
+      // Cache refs
       this.levelEl = this.root.querySelector('#ws-level');
       this.scoreEl = this.root.querySelector('#ws-score');
       this.streakEl= this.root.querySelector('#ws-streak');
@@ -38,24 +69,48 @@
       this.kbEl    = this.root.querySelector('.ws-kb');
       this.bubble  = this.root.querySelector('#ws-bubble');
 
+      // Build grid + keyboard
       this.renderGrid();
       this.renderKeyboard();
+
+      // Bind header actions
+      this.bindHeader();
 
       // Bind physical keyboard ONCE per page
       this.bindKeyboard();
 
-      // Re-bind on-screen keyboard EACH mount (fresh element)
+      // Re-bind on-screen keyboard EACH mount
       this._kbClickBound = false;
       this.bindKbClicks();
 
       console.log('[Wordscend] UI mounted:', config.rows, 'rows ×', config.cols);
     },
 
-    // HUD: "Level 3/4", score, streak
     setHUD(levelText, score, streak){
       if (this.levelEl)  this.levelEl.textContent  = levelText;
       if (this.scoreEl)  this.scoreEl.textContent  = `Score: ${score}`;
       if (this.streakEl) this.streakEl.textContent = `🔥 Streak ${streak ?? 0}`;
+    },
+
+    /* ---------- Header ---------- */
+    bindHeader(){
+      const menu = this.root.querySelector('#ws-menu');
+      const info = this.root.querySelector('#ws-info');
+      const settings = this.root.querySelector('#ws-settings');
+
+      // Dropdown
+      const toggle = () => {
+        const open = menu.classList.toggle('open');
+        menu.querySelector('.menu-btn').setAttribute('aria-expanded', open ? 'true' : 'false');
+      };
+      menu.querySelector('.menu-btn').addEventListener('click', (e)=>{ e.stopPropagation(); toggle(); });
+      document.addEventListener('click', ()=> menu.classList.remove('open'));
+
+      // Info (Rules)
+      info.addEventListener('click', ()=> this.showRulesModal());
+
+      // Settings
+      settings.addEventListener('click', ()=> this.showSettingsModal());
     },
 
     /* ---------- Rendering ---------- */
@@ -92,6 +147,7 @@
         }
 
         if (r < cursor.row) rowEl.classList.add('ws-locked');
+
         this.gridEl.appendChild(rowEl);
       }
     },
@@ -144,7 +200,7 @@
 
         // Escape closes modals
         if (e.key === 'Escape') {
-          document.querySelector('.ws-intro')?.remove();
+          document.querySelector('.ws-modal')?.remove();
           document.querySelector('.ws-endcard')?.remove();
           return;
         }
@@ -284,21 +340,20 @@
       }, { passive:true });
     },
 
-    showIntroCard() {
-      const existing = document.querySelector('.ws-intro');
-      if (existing) existing.remove();
-
+    /* ---------- Modals ---------- */
+    showRulesModal() {
+      document.querySelector('.ws-modal')?.remove();
       const wrap = document.createElement('div');
-      wrap.className = 'ws-intro';
+      wrap.className = 'ws-modal';
       wrap.innerHTML = `
         <div class="card" role="dialog" aria-label="How to play Wordscend">
-          <h3>Welcome to Wordscend 🧩</h3>
-          <p>Climb through <strong>4 levels</strong> of daily word puzzles — from 4-letter to 7-letter words.</p>
-          <p><strong>How to play:</strong></p>
+          <h3>How to Play 🧩</h3>
+          <p>Climb through <strong>4 levels</strong> of daily word puzzles — from 4-letter to 7-letter words. You have <strong>6 tries</strong> per level.</p>
           <ul style="margin:6px 0 0 18px; color:var(--muted); line-height:1.5;">
-            <li>Guess the word in <strong>6 tries</strong>.</li>
-            <li>Tiles turn <strong>green</strong> when correct, <strong>yellow</strong> if misplaced.</li>
-            <li>Beat each level to ascend to the next.</li>
+            <li>Type or tap to guess a word of the current length.</li>
+            <li>Tiles turn <strong>green</strong> (correct spot) or <strong>yellow</strong> (in word, wrong spot).</li>
+            <li>Beat a level to advance to the next length.</li>
+            <li>Keep your <strong>🔥 streak</strong> by playing each day.</li>
           </ul>
           <div class="ws-mini-row" aria-hidden="true">
             <div class="ws-mini-tile correct">C</div>
@@ -307,37 +362,63 @@
             <div class="ws-mini-tile absent">S</div>
             <div class="ws-mini-tile present">Y</div>
           </div>
-          <p style="margin-top:8px;">Keep your <strong>🔥 streak</strong> alive by playing every day.</p>
           <div class="row">
-            <button class="ws-btn primary" data-action="play">Play Now</button>
-            <button class="ws-btn" data-action="later">Maybe Later</button>
+            <button class="ws-btn primary" data-action="close">Got it</button>
           </div>
         </div>
       `;
       document.body.appendChild(wrap);
-
-      const close = () => wrap.remove();
-      wrap.addEventListener('click', (e) => {
-        const btn = e.target.closest('button[data-action]');
-        if (!btn) return;
-        const act = btn.dataset.action;
-        if (act === 'play') {
-          try { localStorage.setItem('ws_intro_seen', '1'); } catch {}
-          close();
-        }
-        if (act === 'later') close();
+      wrap.addEventListener('click', (e)=>{
+        if (e.target.dataset.action === 'close' || e.target === wrap) wrap.remove();
       }, { passive:true });
+      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
+    },
 
-      // Enter = Play, Escape = Close
-      const keyHandler = (e) => {
-        if (e.key === 'Enter') {
-          try { localStorage.setItem('ws_intro_seen', '1'); } catch {}
-          close();
+    showSettingsModal() {
+      document.querySelector('.ws-modal')?.remove();
+      const wrap = document.createElement('div');
+      wrap.className = 'ws-modal';
+      // simple local settings stub (persists in localStorage by app.js if desired later)
+      const sound = localStorage.getItem('ws_sound') !== '0';
+      const colorblind = localStorage.getItem('ws_colorblind') === '1';
+      wrap.innerHTML = `
+        <div class="card" role="dialog" aria-label="Settings">
+          <h3>Settings ⚙️</h3>
+          <div class="ws-form">
+            <div class="ws-field">
+              <label for="ws-sound">Sound effects</label>
+              <input id="ws-sound" type="checkbox" ${sound?'checked':''}/>
+            </div>
+            <div class="ws-field">
+              <label for="ws-cb">Colorblind hints</label>
+              <input id="ws-cb" type="checkbox" ${colorblind?'checked':''}/>
+            </div>
+          </div>
+          <div class="row">
+            <button class="ws-btn primary" data-action="save">Save</button>
+            <button class="ws-btn" data-action="close">Close</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(wrap);
+      wrap.addEventListener('click', (e)=>{
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) { if (e.target === wrap) wrap.remove(); return; }
+        const act = btn.dataset.action;
+        if (act === 'save'){
+          const s = wrap.querySelector('#ws-sound').checked;
+          const cb= wrap.querySelector('#ws-cb').checked;
+          try {
+            localStorage.setItem('ws_sound', s ? '1':'0');
+            localStorage.setItem('ws_colorblind', cb ? '1':'0');
+          } catch {}
+          btn.textContent='Saved';
+          setTimeout(()=>wrap.remove(), 400);
         }
-        if (e.key === 'Escape') close();
-      };
-      window.addEventListener('keydown', keyHandler, { once: true });
-    }
+        if (act === 'close') wrap.remove();
+      }, { passive:true });
+      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
+    },
   };
 
   global.WordscendUI = UI;
