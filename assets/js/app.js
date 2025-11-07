@@ -19,7 +19,8 @@
       endcard: p.get('endcard'),
       score: p.get('score'),
       reset: p.get('reset'),
-      intro: p.get('intro')
+      intro: p.get('intro'),
+      settings: p.get('settings')
     };
   }
 
@@ -41,19 +42,17 @@
   }
 
   /* ---------------- Config ---------------- */
-  // If hosting paths differ, update these BASE paths to match your repo structure
   const BASE = 'https://innovative-edge-consulting.github.io/web-games';
   const ALLOWED_URL = 'https://raw.githubusercontent.com/dwyl/english-words/master/words.txt';
   const SCORE_TABLE = [100, 70, 50, 35, 25, 18];
   const LEVEL_LENGTHS = [4, 5, 6, 7];
-  const STORE_KEY = 'wordscend_v3'; // days-played streak mode
+  const STORE_KEY = 'wordscend_v3';
 
   function defaultStore() {
     return {
       day: todayKey(),
       score: 0,
       levelIndex: 0,
-      // Play-streak (days played), not completion-streak
       streak: { current: 0, best: 0, lastPlayDay: null, markedToday: false }
     };
   }
@@ -131,9 +130,9 @@
   const store = applyUrlOverrides(store0);
 
   Promise.all([
-    loadScript(`${BASE}/core/engine.js?v=restored-1`),
-    loadScript(`${BASE}/ui/dom-view.js?v=restored-1`),
-    loadScript(`${BASE}/core/dictionary.js?v=restored-1`)
+    loadScript(`${BASE}/core/engine.js?v=header-1`),
+    loadScript(`${BASE}/ui/dom-view.js?v=header-1`),
+    loadScript(`${BASE}/core/dictionary.js?v=header-1`)
   ])
   .then(async () => {
     const { allowedSet } = await window.WordscendDictionary.loadDWYL(ALLOWED_URL, {
@@ -150,20 +149,17 @@
       return;
     }
 
-    // Normal start
+    // Start the requested/current level
     await startLevel(store.levelIndex);
 
-    // Intro Card — once per user, or force via ?intro=1
-    const introSeen = (localStorage.getItem('ws_intro_seen') === '1');
-    if (qp.intro === '1' || !introSeen) {
-      window.WordscendUI.showIntroCard();
-    }
+    // On-demand modals for QA:
+    if (qp.intro === '1') window.WordscendUI.showRulesModal();
+    if (qp.settings === '1') window.WordscendUI.showSettingsModal();
 
     /* ------------ functions ------------ */
     async function startLevel(idx){
       const levelLen = LEVEL_LENGTHS[idx];
 
-      // Create an answer list: curated -> fallback from allowed set by length
       const curated = window.WordscendDictionary.answersOfLength(levelLen);
       const list = curated && curated.length
         ? curated
