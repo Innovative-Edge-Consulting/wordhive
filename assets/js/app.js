@@ -30,27 +30,59 @@
     const da = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${da}`;
   }
+  function dateMinus(ymd, n){
+    const [y,m,d] = ymd.split('-').map(Number);
+    const dt = new Date(y, m-1, d);
+    dt.setDate(dt.getDate() - n);
+    const yy = dt.getFullYear();
+    const mm = String(dt.getMonth()+1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    return `${yy}-${mm}-${dd}`;
+  }
 
   /* ---------------- Config ---------------- */
   const BASE = 'https://innovative-edge-consulting.github.io/web-games';
   const ALLOWED_URL = 'https://raw.githubusercontent.com/dwyl/english-words/master/words.txt';
   const SCORE_TABLE = [100, 70, 50, 35, 25, 18];
   const LEVEL_LENGTHS = [4, 5, 6, 7];
-  const STORE_KEY = 'wordscend_v2';
+  const STORE_KEY = 'wordscend_v3'; // bump version for streak mode change
 
   function defaultStore() {
     return {
       day: todayKey(),
       score: 0,
       levelIndex: 0,
-      streak: { current: 0, best: 0, lastCompleteDay: null }
+      // Play-streak (days played), not completion-streak
+      streak: { current: 0, best: 0, lastPlayDay: null, markedToday: false }
     };
   }
+
   function loadStore() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
       if (!raw) return defaultStore();
       const parsed = JSON.parse(raw);
+
+      // migrate from older schemas:
+      if (!parsed.streak) parsed.streak = {};
+      // if old field existed, map lastCompleteDay -> lastPlayDay (best effort)
+      if (!parsed.streak.lastPlayDay && parsed.streak.lastCompleteDay) {
+        parsed.streak.lastPlayDay = parsed.streak.lastCompleteDay;
+      }
+      parsed.streak.current = Number(parsed.streak.current || 0);
+      parsed.streak.best    = Number(parsed.streak.best || 0);
+      parsed.streak.lastPlayDay = parsed.streak.lastPlayDay || null;
+      parsed.streak.markedToday = !!parsed.streak.markedToday;
+
+      // day rollover: reset level & score each day; DO NOT touch streak counters here
+      const today = todayKey();
+      if (parsed.day !== today) {
+        parsed.day = today;
+        parsed.score = 0;
+        parsed.levelIndex = 0;
+        parsed.streak.markedToday = false; // new day, not marked yet
+      }
+      // legacy: remove levelLen if present
       if (parsed.levelLen && parsed.levelIndex == null) {
         const idx = Math.max(0, LEVEL_LENGTHS.indexOf(parsed.levelLen));
         parsed.levelIndex = (idx === -1) ? 0 : idx;
@@ -58,20 +90,37 @@
       }
       parsed.levelIndex = Number.isInteger(parsed.levelIndex) ? parsed.levelIndex : 0;
       parsed.score = typeof parsed.score === 'number' ? parsed.score : 0;
-      if (!parsed.streak) parsed.streak = { current: 0, best: 0, lastCompleteDay: null };
 
-      const today = todayKey();
-      if (parsed.day !== today) {
-        parsed.day = today;
-        parsed.score = 0;
-        parsed.levelIndex = 0;
-      }
       return parsed;
     } catch {
       return defaultStore();
     }
   }
+
   function saveStore(s){ localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
+
+  // Mark the day as "played" the first time a VALID guess is submitted today
+  function markPlayedToday(store) {
+    const today = todayKey();
+    const st = store.streak;
+    if (st.markedToday) return false;            // already counted a play today
+    if (st.lastPlayDay === today) {              // safety (shouldn’t happen if markedToday works)
+      st.markedToday = true;
+      saveStore(store);
+      return true;
+    }
+    // increment streak if consecutive; else start at 1
+    if (st.lastPlayDay === dateMinus(today, 1)) {
+      st.current = (st.current || 0) + 1;
+    } else {
+      st.current = 1;
+    }
+    if ((st.current || 0) > (st.best || 0)) st.best = st.current;
+    st.lastPlayDay = today;
+    st.markedToday = true;
+    saveStore(store);
+    return true;
+  }
 
   function applyUrlOverrides(store) {
     const q = getParams();
@@ -96,9 +145,9 @@
   const store = applyUrlOverrides(store0);
 
   Promise.all([
-    loadScript(`${BASE}/core/engine.js?v=100`),
-    loadScript(`${BASE}/ui/dom-view.js?v=100`),
-    loadScript(`${BASE}/core/dictionary.js?v=100`)
+    loadScript(`${BASE}/core/engine.js?v=110`),
+    loadScript(`${BASE}/ui/dom-view.js?v=110`),
+    loadScript(`${BASE}/core/dictionary.js?v=110`)
   ])
   .then(async () => {
     const { allowedSet } = await window.WordscendDictionary.loadDWYL(ALLOWED_URL, {
@@ -118,14 +167,10 @@
     // Normal start
     await startLevel(store.levelIndex);
 
-    // Intro Card — show once per user, or force via ?intro=1
+    // Intro Card — once per user, or force via ?intro=1
     const introSeen = (localStorage.getItem('ws_intro_seen') === '1');
     if (qp.intro === '1' || !introSeen) {
       window.WordscendUI.showIntroCard();
-      // if forced by ?intro=1, do not auto-set seen flag; user must click Play Now
-      if (!introSeen && qp.intro !== '1') {
-        // we set it only when they press Play Now; handled in UI.showIntroCard
-      }
     }
 
     /* ------------ functions ------------ */
@@ -146,6 +191,14 @@
       window.WordscendEngine.submitRow = function(){
         const res = origSubmit();
 
+        // Mark a "played" day only when a VALID guess (full row) was processed
+        if (res && res.ok) {
+          if (markPlayedToday(store)) {
+            // refresh HUD streak immediately after first valid attempt today
+            window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
+          }
+        }
+
         if (res && res.ok && res.done) {
           if (res.win) {
             const attempt = res.attempt ?? 6;
@@ -159,23 +212,8 @@
             const isLast = (idx === LEVEL_LENGTHS.length - 1);
             setTimeout(() => {
               if (isLast) {
-                // Streak update on full completion
-                const today = todayKey();
-                const last = store.streak.lastCompleteDay;
-                if (last === dateMinus(today, 1)) {
-                  store.streak.current = (store.streak.current || 0) + 1;
-                } else if (last !== today) {
-                  store.streak.current = 1;
-                }
-                if ((store.streak.current || 0) > (store.streak.best || 0)) {
-                  store.streak.best = store.streak.current;
-                }
-                store.streak.lastCompleteDay = today;
-                saveStore(store);
-
+                // End of daily run → reset score/level for the next day’s play (streak persists)
                 window.WordscendUI.showEndCard(store.score, store.streak.current, store.streak.best);
-
-                // Reset for next daily run (streak persists)
                 store.day = todayKey();
                 store.score = 0;
                 store.levelIndex = 0;
@@ -201,17 +239,6 @@
     function mountBlankStage(){
       window.WordscendUI.mount(root, { rows:6, cols:5 });
       window.WordscendUI.setHUD(`Level 4/4`, store.score, store.streak.current);
-    }
-
-    function dateMinus(ymd, n){
-      // ymd is "YYYY-MM-DD" (todayKey)
-      const [y,m,d] = ymd.split('-').map(Number);
-      const dt = new Date(y, m-1, d);
-      dt.setDate(dt.getDate() - n);
-      const yy = dt.getFullYear();
-      const mm = String(dt.getMonth()+1).padStart(2, '0');
-      const dd = String(dt.getDate()).padStart(2, '0');
-      return `${yy}-${mm}-${dd}`;
     }
   })
   .catch(err => {
