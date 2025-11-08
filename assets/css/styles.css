@@ -1,10 +1,17 @@
-/* ===== Base theme ===== */
+/* ===================== THEME VARS ===================== */
+/* Default: dark (can be overridden by [data-theme] on <html>) */
 :root{
   --brand:#497f64;
+
+  /* Dark */
   --bg:#0d0f10;
   --text:#ffffff;
   --muted:#a5b3a8;
   --border:#2a2d31;
+  --btnBg:#12161a;
+
+  --tile:#0f1214;
+  --tileFilled:#111419;
 
   --tileSize: clamp(40px, min(9.2vw, (100vw - 64px)/7), 56px);
 
@@ -12,10 +19,37 @@
   --present:#e3b341; /* yellow */
   --absent:#3a3f45;  /* gray */
 
-  --btnBg:#12161a;
+  --glass:#0e1115cc;
+  --card:#111419;
+  --shadow: 0 12px 32px rgba(0,0,0,.45);
+  --bubbleShadow: 0 6px 18px rgba(0,0,0,.35);
 }
 
-/* Global */
+/* Light theme overrides */
+:root[data-theme="light"]{
+  --bg:#f6f7f9;
+  --text:#0b0d0f;
+  --muted:#5c636a;
+  --border:#d5d9df;
+  --btnBg:#ffffff;
+
+  --tile:#ffffff;
+  --tileFilled:#f0f3f6;
+
+  --absent:#cbd3dc;
+
+  --glass:#ffffffcc;
+  --card:#ffffff;
+  --shadow: 0 10px 26px rgba(0,0,0,.08);
+  --bubbleShadow: 0 8px 16px rgba(0,0,0,.10);
+}
+
+/* Optional: explicit dark attr (same as default) */
+:root[data-theme="dark"]{
+  --bg:#0d0f10;
+}
+
+/* ===================== GLOBAL ===================== */
 html,body{height:100%}
 body{
   margin:0;
@@ -24,13 +58,13 @@ body{
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
 }
 
-/* ===== Topbar (Header: brand + actions only) ===== */
+/* ===================== TOP BAR ===================== */
 .ws-topbar{
   position:sticky;
   top:0;
   z-index:40;
   width:100%;
-  background:#0e1115cc;
+  background:var(--glass);
   backdrop-filter: blur(6px);
   border-bottom:1px solid var(--border);
 }
@@ -65,9 +99,9 @@ body{
   background:var(--btnBg);
   cursor:pointer;
 }
-.icon-btn svg{ width:18px; height:18px; stroke:#e8e8e8; }
+.icon-btn svg{ width:18px; height:18px; stroke:currentColor; color:var(--text); }
 
-/* ===== Stage + HUD ===== */
+/* ===================== HUD ===================== */
 #game{
   width:100%;
   max-width:720px;
@@ -92,7 +126,7 @@ body{
   padding:8px 10px;
   border:1px solid var(--border);
   border-radius:10px;
-  background:#111419;
+  background:var(--card);
   color:var(--text);
 }
 .ws-hud-right{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -105,7 +139,7 @@ body{
 }
 .ws-tag.pulse { animation: ws-pulse 260ms ease; }
 
-/* ===== Stage wrapper (bubble overlays grid) ===== */
+/* ===================== STAGE ===================== */
 .ws-stage{
   width:100%;
   max-width:560px;
@@ -116,7 +150,7 @@ body{
   gap:12px;
 }
 
-/* ===== Grid ===== */
+/* ===================== GRID ===================== */
 .ws-grid{
   display:grid;
   gap:8px;
@@ -135,20 +169,21 @@ body{
   place-items:center;
   font-weight:700;
   text-transform:uppercase;
-  background:#0f1214;
+  background:var(--tile);
   color:var(--text);
   user-select:none;
   transition:transform .06s ease, background .15s ease, border-color .15s ease;
   transform-style:preserve-3d;
 }
 .ws-tile.active{ outline:2px solid var(--brand); outline-offset:-2px; }
-.ws-tile.filled{ background:#111419; border-color:#3a3f45; }
+.ws-tile.filled{ background:var(--tileFilled); border-color:#3a3f45; }
+:root[data-theme="light"] .ws-tile.filled{ border-color:var(--border); }
 .ws-row.ws-locked .ws-tile{ opacity:.9; }
 
 /* Submitted colors */
 .ws-tile.state-correct{ background:var(--correct); border-color:var(--correct); color:#000; }
 .ws-tile.state-present{ background:var(--present); border-color:var(--present); color:#000; }
-.ws-tile.state-absent{  background:var(--absent);  border-color:#000; color:#fff; }
+.ws-tile.state-absent{  background:var(--absent);  border-color:#0000; color:var(--text); }
 
 /* Flip animation */
 @keyframes ws-flip-1 {
@@ -167,13 +202,13 @@ body{
 }
 .ws-row.shake .ws-tile{ animation:ws-shake 120ms linear 0s 2; }
 
-/* ===== Keyboard ===== */
+/* ===================== KEYBOARD ===================== */
 .ws-kb{
   margin-top:8px;
   display:grid;
   gap:8px;
   width:100%;
-  padding: 0 12px;                /* side padding on mobile */
+  padding: 0 12px;
   -webkit-tap-highlight-color: transparent;
 }
 .ws-kb-row{
@@ -188,7 +223,7 @@ body{
   min-width:34px;
   border-radius:8px;
   border:1px solid var(--border);
-  background:#12161a;
+  background:var(--btnBg);
   color:var(--text);
   cursor:pointer;
   user-select:none;
@@ -201,21 +236,21 @@ body{
 /* Keyboard color states */
 .ws-kb-key.k-correct{ background:var(--correct); border-color:var(--correct); color:#000; }
 .ws-kb-key.k-present{ background:var(--present); border-color:var(--present); color:#000; }
-.ws-kb-key.k-absent{  background:var(--absent);  border-color:#000;  color:#fff; }
+.ws-kb-key.k-absent{  background:var(--absent);  border-color:#0000;  color:var(--text); }
 
-/* ===== Bubble message ===== */
+/* ===================== BUBBLE ===================== */
 .ws-bubble{
   position:absolute;
   left:50%;
   top:0;
   transform:translate(-50%, -12px);
-  background:#111419;
+  background:var(--card);
   color:var(--text);
   border:1px solid var(--border);
   border-radius:12px;
   padding:10px 12px;
   font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-  box-shadow:0 6px 18px rgba(0,0,0,.35);
+  box-shadow:var(--bubbleShadow);
   opacity:0;
   pointer-events:none;
   transition:opacity .18s ease, transform .18s ease;
@@ -224,7 +259,7 @@ body{
 }
 .ws-bubble.show{ opacity:1; transform:translate(-50%, -24px); }
 
-/* ===== Modals: Generic, End Card, Rules, Settings ===== */
+/* ===================== MODALS / CARDS ===================== */
 .ws-modal,
 .ws-endcard{
   position:fixed;
@@ -235,14 +270,18 @@ body{
   justify-content:center;
   z-index:50;
 }
+:root[data-theme="light"] .ws-modal,
+:root[data-theme="light"] .ws-endcard{
+  background:rgba(8,10,12,.35);
+}
 .ws-modal .card,
 .ws-endcard .card{
   width:min(92vw, 560px);
-  background:#111419;
+  background:var(--card);
   border:1px solid var(--border);
   border-radius:16px;
   padding:20px;
-  box-shadow:0 12px 32px rgba(0,0,0,.45);
+  box-shadow:var(--shadow);
 }
 .ws-modal h3,
 .ws-endcard h3{
@@ -255,7 +294,7 @@ body{
 .ws-endcard .row{ display:flex; gap:8px; margin-top:12px; flex-wrap:wrap }
 .ws-btn{
   border:1px solid var(--border);
-  background:#12161a;
+  background:var(--btnBg);
   color:var(--text);
   border-radius:10px;
   padding:10px 12px;
@@ -265,28 +304,33 @@ body{
 .ws-btn.primary{ background:var(--brand); color:#fff; border-color:var(--brand) }
 
 /* Mini example tiles inside rules */
-.ws-mini-row{
-  display:grid; grid-auto-flow:column; gap:6px; margin-top:8px;
-}
+.ws-mini-row{ display:grid; grid-auto-flow:column; gap:6px; margin-top:8px; }
 .ws-mini-tile{
   width:28px; height:28px; border-radius:6px; display:grid; place-items:center;
   font:700 12px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; text-transform:uppercase;
-  border:1px solid #000;
+  border:1px solid #0000;
 }
-.ws-mini-tile.correct{ background:var(--correct); color:#000; border-color:var(--correct); }
-.ws-mini-tile.present{ background:var(--present); color:#000; border-color:var(--present); }
-.ws-mini-tile.absent{  background:var(--absent);  color:#fff; border-color:#000; }
+.ws-mini-tile.correct{ background:var(--correct); color:#000; }
+.ws-mini-tile.present{ background:var(--present); color:#000; }
+.ws-mini-tile.absent{  background:var(--absent);  color:var(--text); }
 
 /* Settings form */
 .ws-form{ display:grid; gap:10px; }
 .ws-field{
   display:flex; align-items:center; justify-content:space-between;
-  background:#0f1317; border:1px solid var(--border); padding:10px; border-radius:10px;
+  background:var(--tile);
+  border:1px solid var(--border);
+  padding:10px; border-radius:10px;
 }
 .ws-field label{ font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
 .ws-field input[type="checkbox"]{ width:18px; height:18px; }
+.ws-field select{
+  font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  color:var(--text); background:var(--btnBg);
+  border:1px solid var(--border); border-radius:8px; padding:8px 10px;
+}
 
-/* ===== Floating points chip ===== */
+/* Floating points chip */
 .ws-fxfloat{
   position:fixed;
   z-index:60;
@@ -294,17 +338,18 @@ body{
   font:800 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
   padding:6px 8px;
   border-radius:999px;
-  background:#111419;
+  background:var(--card);
   border:1px solid var(--border);
-  color:#fff;
+  color:var(--text);
   box-shadow:0 8px 20px rgba(0,0,0,.45);
   transition: transform 420ms cubic-bezier(.22,.82,.25,1), opacity 420ms ease, left 420ms ease, top 420ms ease;
   opacity:.98;
 }
+:root[data-theme="light"] .ws-fxfloat{ box-shadow:0 8px 16px rgba(0,0,0,.12); }
 .ws-fxfloat.green{ background:var(--correct); color:#000; border-color:var(--correct); }
 .ws-fxfloat.yellow{ background:var(--present); color:#000; border-color:var(--present); }
 
-/* ===== Mobile tweaks ===== */
+/* ===================== MOBILE ===================== */
 @media (max-width: 430px){
   :root{ --tileSize: clamp(36px, 10.5vw, 48px); }
   .ws-kb{ padding: 0 10px; gap: 6px; }
@@ -313,7 +358,7 @@ body{
   .ws-modal .card, .ws-endcard .card { padding:16px; }
 }
 
-/* ===== HUD layout tweaks ===== */
+/* HUD spacing tweak */
 .ws-hud-right { gap:8px; }
 @media (max-width:430px){
   .ws-hud-right { gap:6px; }
