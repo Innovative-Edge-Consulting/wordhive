@@ -1,5 +1,25 @@
 // /assets/js/app.js
 (function () {
+  /* ---------- Pre-apply Theme to avoid flash ---------- */
+  (function initThemeEarly(){
+    try{
+      const pref = localStorage.getItem('ws_theme') || 'dark';
+      const el = document.documentElement;
+      const apply = (p) => el.setAttribute('data-theme', p==='auto'
+        ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : p
+      );
+      apply(pref);
+      if (pref === 'auto') {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        const cb = (e)=> apply('auto');
+        mq.addEventListener?.('change', cb);
+        // store a weak ref so GC can clean up later; not critical
+        window.__ws_theme_mql = mq; window.__ws_theme_cb = cb;
+      }
+    }catch{}
+  })();
+
   /* ---------------- Utilities ---------------- */
   function loadScript(src) {
     return new Promise((resolve, reject) => {
@@ -124,7 +144,7 @@
 
   /* ---------------- Bootstrap ---------------- */
   const root = document.getElementById('game') || document.body;
-  root.innerHTML = '<div style="margin:24px 0;font:600 14px system-ui;color:#fff;opacity:.8;">Loading word list…</div>';
+  root.innerHTML = '<div style="margin:24px 0;font:600 14px system-ui;color:var(--text);opacity:.8;">Loading word list…</div>';
 
   const store0 = loadStore();
   const store = applyUrlOverrides(store0);
@@ -136,7 +156,6 @@
       if (!isFinite(d) || d === 0) return;
       store.score = Math.max(0, (store.score || 0) + d);
       saveStore(store);
-      // Refresh HUD immediately
       if (window.WordscendUI) {
         window.WordscendUI.setHUD(`Level ${store.levelIndex+1}/4`, store.score, store.streak.current);
       }
@@ -145,7 +164,7 @@
 
   Promise.all([
     loadScript(`${BASE}/core/engine.js?v=header-1`),
-    loadScript(`${BASE}/ui/dom-view.js?v=header-1`),
+    loadScript(`${BASE}/ui/dom-view.js?v=header-2-theme`),
     loadScript(`${BASE}/core/dictionary.js?v=header-1`)
   ])
   .then(async () => {
@@ -166,7 +185,7 @@
     // Start the requested/current level
     await startLevel(store.levelIndex);
 
-    // On-demand modals for QA:
+    // On-demand modals for QA
     if (qp.intro === '1') window.WordscendUI.showRulesModal();
     if (qp.settings === '1') window.WordscendUI.showSettingsModal();
 
@@ -203,7 +222,7 @@
         if (res && res.ok && res.done) {
           if (res.win) {
             const attempt = res.attempt ?? 6;
-            const gained = SCORE_TABLE[Math.min(Math.max(attempt,1),6) - 1] || 0;
+            const gained = [100,70,50,35,25,18][Math.min(Math.max(attempt,1),6) - 1] || 0;
 
             // Add per-level bonus on top of live chip points
             store.score += gained;
@@ -216,7 +235,7 @@
             setTimeout(() => {
               if (isLast) {
                 window.WordscendUI.showEndCard(store.score, store.streak.current, store.streak.best);
-                // Reset score/level for next day’s run (streak persists)
+                // Reset for next daily
                 store.day = todayKey();
                 store.score = 0;
                 store.levelIndex = 0;
@@ -246,6 +265,6 @@
   })
   .catch(err => {
     console.error('[Wordscend] Bootstrap failed:', err);
-    root.innerHTML = '<div style="margin:24px 0;font:600 14px system-ui;color:#fff;">Failed to load. Please refresh.</div>';
+    root.innerHTML = '<div style="margin:24px 0;font:600 14px system-ui;color:var(--text);">Failed to load. Please refresh.</div>';
   });
 })();
