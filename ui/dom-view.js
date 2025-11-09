@@ -12,7 +12,7 @@
     current: null,
     getPref() { return localStorage.getItem('ws_theme') || 'dark'; },
     setPref(v){ try{ localStorage.setItem('ws_theme', v); }catch{} },
-    systemIsDark(){ 
+    systemIsDark(){
       this.media = this.media || window.matchMedia('(prefers-color-scheme: dark)');
       return this.media.matches;
     },
@@ -100,6 +100,10 @@
       // Ensure theme is applied on mount too (app.js also pre-applies to avoid flash)
       Theme.apply(Theme.getPref());
 
+      // Apply colorblind attribute from saved pref
+      const cbInit = (localStorage.getItem('ws_colorblind') === '1');
+      document.documentElement.setAttribute('data-cb', cbInit ? '1' : '0');
+
       // Topbar (brand + actions) + HUD + Stage + Keyboard
       this.root.innerHTML = `
         <div class="ws-topbar">
@@ -135,7 +139,7 @@
         </div>
 
         <div class="ws-kb" aria-label="On-screen keyboard"></div>
-      `;
+      ";
 
       // Cache refs
       this.levelEl = this.root.querySelector('#ws-level');
@@ -259,6 +263,7 @@
 
       window.addEventListener('keydown', (e) => {
         const tag = (e.target && e.target.tagName || '').toLowerCase();
+        if (e.repeat) return; // avoid auto-repeats
         if (tag === 'input' || tag === 'textarea' || e.metaKey || e.ctrlKey || e.altKey) return;
 
         // Escape closes modals
@@ -302,6 +307,9 @@
         return;
       }
       if (key === 'Enter') {
+        const cur = global.WordscendEngine.getCursor();
+        if (cur.col === 0) { this.showBubble('Type a word first'); return; }
+
         const res = global.WordscendEngine.submitRow();
         if (!res.ok && res.reason === 'incomplete') {
           this.shakeCurrentRow();
@@ -409,7 +417,7 @@
           setTimeout(()=>{
             chip.style.left = `${sRect.left + sRect.width/2}px`;
             chip.style.top  = `${sRect.top  + sRect.height/2}px`;
-            chip.style.transform = 'translate(-50%, -50%) scale(0.8)';
+            chip.style.transform = 'translate(-50%, -50%) scale(0.8)`;
             chip.style.opacity = '0.0';
           }, 160);
         });
@@ -446,12 +454,17 @@
       `;
       document.body.appendChild(wrap);
 
-      const shareText = `I just finished today's Wordscend (4→7 letters) with ${score} points! Streak: ${streakCurrent} (best ${streakBest}).`;
+      const shareText = `I just finished today's Wordscend (4→7 letters) with ${score} points! Streak: ${streakCurrent} (best ${streakBest}). Play: https://leashfree.ca/games/wordscend`;
+      const prevFocus = document.activeElement;
+      wrap.querySelector('button')?.focus();
+
+      const closeWrap = () => { wrap.remove(); prevFocus?.focus(); };
+
       wrap.addEventListener('click', async (e) => {
         const btn = e.target.closest('button[data-action]');
-        if (!btn) return;
+        if (!btn) { if (e.target === wrap) closeWrap(); return; }
         const act = btn.dataset.action;
-        if (act === 'close') wrap.remove();
+        if (act === 'close') closeWrap();
         if (act === 'copy') {
           try { await navigator.clipboard.writeText(shareText); btn.textContent = 'Copied!'; }
           catch { btn.textContent = 'Copy failed'; }
@@ -465,6 +478,8 @@
           }
         }
       }, { passive:true });
+
+      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ closeWrap(); }}, { once:true });
     },
 
     /* ---------- Modals ---------- */
@@ -476,7 +491,7 @@
         <div class="card" role="dialog" aria-label="How to play Wordscend">
           <h3>How to Play 🧩</h3>
           <p>Climb through <strong>4 levels</strong> of daily word puzzles — from 4-letter to 7-letter words. You have <strong>6 tries</strong> per level.</p>
-          <ul style="margin:6px 0 0 18px; color:var(--muted); line-height:1.5%;">
+          <ul style="margin:6px 0 0 18px; color:var(--muted); line-height:1.5;">
             <li>Type or tap to guess a word of the current length.</li>
             <li>Tiles turn <strong>green</strong> (correct spot) or <strong>yellow</strong> (in word, wrong spot).</li>
             <li>Beat a level to advance to the next length.</li>
@@ -495,10 +510,16 @@
         </div>
       `;
       document.body.appendChild(wrap);
+
+      const prev = document.activeElement;
+      wrap.querySelector('button')?.focus();
+
+      const closeWrap = () => { wrap.remove(); prev?.focus(); };
+
       wrap.addEventListener('click', (e)=>{
-        if (e.target.dataset.action === 'close' || e.target === wrap) wrap.remove();
+        if (e.target.dataset.action === 'close' || e.target === wrap) closeWrap();
       }, { passive:true });
-      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
+      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ closeWrap(); }}, { once:true });
     },
 
     showSettingsModal() {
@@ -539,9 +560,14 @@
       `;
       document.body.appendChild(wrap);
 
+      const prev = document.activeElement;
+      wrap.querySelector('button')?.focus();
+
+      const closeWrap = () => { wrap.remove(); prev?.focus(); };
+
       wrap.addEventListener('click', (e)=>{
         const btn = e.target.closest('button[data-action]');
-        if (!btn) { if (e.target === wrap) wrap.remove(); return; }
+        if (!btn) { if (e.target === wrap) closeWrap(); return; }
         const act = btn.dataset.action;
         if (act === 'save'){
           const theme = wrap.querySelector('#ws-theme').value;
@@ -552,14 +578,15 @@
             Theme.apply(theme);
             localStorage.setItem('ws_sound', s ? '1':'0');
             localStorage.setItem('ws_colorblind', cb ? '1':'0');
+            document.documentElement.setAttribute('data-cb', cb ? '1' : '0');
           } catch {}
           btn.textContent='Saved';
-          setTimeout(()=>wrap.remove(), 420);
+          setTimeout(()=>closeWrap(), 420);
         }
-        if (act === 'close') wrap.remove();
+        if (act === 'close') closeWrap();
       }, { passive:true });
 
-      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
+      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ closeWrap(); }}, { once:true });
     },
   };
 
