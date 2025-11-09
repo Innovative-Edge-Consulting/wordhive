@@ -1,5 +1,7 @@
 // /core/engine.js
 (function (global) {
+  const LEVEL_LENGTHS = [4,5,6,7];
+
   const STATE = {
     rows: 6,
     cols: 5,
@@ -141,10 +143,13 @@
     };
   }
 
+  function getLevelLengths(){ return LEVEL_LENGTHS.slice(); }
+
   global.WordscendEngine = {
     init, setAnswer, setAllowed,
     getBoard, getRowMarks, getCursor, isDone,
     addLetter, backspace, submitRow,
-    getKeyStatus
+    getKeyStatus,
+    getLevelLengths
   };
 })(window);
