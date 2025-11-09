@@ -2,20 +2,19 @@
 (function (global) {
   const Dict = {
     _allowedSet: new Set(),
-    _answers: { 4: [], 5: [], 6: [], 7: [] },
+    _answers: { 4:[], 5:[], 6:[], 7:[] },
 
-    async loadDWYL(url, opts = {}) {
-      const minLen = opts.minLen ?? 4;
-      const maxLen = opts.maxLen ?? 7;
-
-      const res = await fetch(url, { cache: 'no-store' });
+    async loadDWYL(url, opts){
+      const minLen = (opts && opts.minLen) || 4;
+      const maxLen = (opts && opts.maxLen) || 7;
+      const res = await fetch(url, { cache:'no-store' });
       if (!res.ok) throw new Error('Failed to load word list');
       const text = await res.text();
 
       const set = new Set();
       const lines = text.split(/\r?\n/);
-      for (let i = 0; i < lines.length; i++) {
-        const w = (lines[i] || '').trim().toUpperCase();
+      for (let i=0;i<lines.length;i++){
+        const w = (lines[i]||'').trim().toUpperCase();
         if (!w) continue;
         if (w.length < minLen || w.length > maxLen) continue;
         if (!/^[A-Z]+$/.test(w)) continue;
@@ -25,30 +24,20 @@
       return { allowedSet: this._allowedSet };
     },
 
-    answersOfLength(len) {
+    answersOfLength(len){
       const list = this._answers[len] || [];
       return list.length ? list.slice() : null;
     },
 
-    pickToday(list) {
+    pickToday(list){
       if (!list || !list.length) return 'WORD';
-      const d = new Date();
-      const y = d.getFullYear();
-      const m = d.getMonth() + 1;
-      const day = d.getDate();
-      const key = `${y}-${m}-${day}`;
-
-      let h = 2166136261;
-      for (let i = 0; i < key.length; i++) {
-        h ^= key.charCodeAt(i);
-        h = (h * 16777619) >>> 0;
-      }
+      const d=new Date(); const key = d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+      let h = 2166136261; for (let i=0;i<key.length;i++){ h ^= key.charCodeAt(i); h = (h * 16777619) >>> 0; }
       const idx = h % list.length;
       return list[idx];
     },
 
     get allowedSet(){ return this._allowedSet; }
   };
-
   global.WordscendDictionary = Dict;
 })(window);
