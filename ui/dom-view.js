@@ -118,7 +118,7 @@
               <button class="icon-btn" id="ws-settings" type="button" title="Settings" aria-label="Settings">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.5"/>
-                  <path d="M19.4 13.1a7.9 7.9 0 0 0 0-2.2l2-1.5-1.6-2.7-2.4.9a8 8 0 0 0-1.9-1.1l-.3-2.5h-3.2l-.3 2.5c-.7.2-1.3.6-1.9 1.1l-2.4-.9-1.6 2.7 2 1.5a7.9 7.9 0 0 0 0 2.2l-2 1.5 1.6 2.7 2.4-.9c.6.5 1.2.8 1.9 1.1l.3 2.5h3.2l.3-2.5c.7-.2 1.3-.6 1.9-1.1l2.4.9 1.6-2.7-2-1.5Z" stroke="currentColor" stroke-width="1.5"/>
+                  <path d="M19.4 13.1a7.9 7.9 0 0 0 0-2.2l2-1.5-1.6-2.7-2.4.9a8 8 0 0 0-1.9-1.1l-.3-2.5h-3.2l-.3 2.5c-.7.2-1.3.6-1.9 1.1l-2.4-.9-1.6 2.7 2 1.5a7.9 7.9 0 0 0 0 2.2l-2 1.5 1.6 2.7 2.4-.9c.6.5 1.2.8 1.9 1.1l2.4.9 1.6-2.7-2-1.5Z" stroke="currentColor" stroke-width="1.5"/>
                 </svg>
               </button>
             </div>
@@ -139,7 +139,7 @@
         </div>
 
         <div class="ws-kb" aria-label="On-screen keyboard"></div>
-      `; // <-- FIX 1: proper closing backtick for template literal
+      `;
 
       // Cache refs
       this.levelEl = this.root.querySelector('#ws-level');
@@ -263,7 +263,7 @@
 
       window.addEventListener('keydown', (e) => {
         const tag = (e.target && e.target.tagName || '').toLowerCase();
-        if (e.repeat) return; // avoid auto-repeats
+        if (e.repeat) return;
         if (tag === 'input' || tag === 'textarea' || e.metaKey || e.ctrlKey || e.altKey) return;
 
         // Escape closes modals
@@ -344,6 +344,32 @@
       const rowEl = rows[rowIndex];
       if (!rowEl) return;
 
+      const board = global.WordscendEngine.getBoard();
+      const rowLetters = (board[rowIndex] || []).map(ch => (ch || '').toUpperCase());
+
+      // Build answer frequency map and already-awarded counts from previous rows
+      const answer = (global.WordscendEngine.getAnswer?.() || '').toUpperCase();
+      const ansFreq = {};
+      for (let i = 0; i < answer.length; i++) {
+        const ch = answer[i];
+        ansFreq[ch] = (ansFreq[ch] || 0) + 1;
+      }
+
+      const prevMarks = global.WordscendEngine.getRowMarks();
+      const awarded = {}; // letter -> how many times we've already given points across prior rows
+      const countIfScored = (m) => (m === 'correct' || m === 'present');
+
+      for (let r = 0; r < rowIndex; r++) {
+        const mks = prevMarks[r] || [];
+        const row = board[r] || [];
+        for (let c = 0; c < mks.length; c++) {
+          if (countIfScored(mks[c])) {
+            const ch = (row[c] || '').toUpperCase();
+            awarded[ch] = (awarded[ch] || 0) + 1;
+          }
+        }
+      }
+
       const tiles = Array.from(rowEl.querySelectorAll('.ws-tile'));
       tiles.forEach((tile, i) => {
         const delay = i * 80; // stagger
@@ -356,12 +382,23 @@
             tile.classList.remove('state-correct','state-present','state-absent');
             tile.classList.add('state-' + mark);
 
-            // Visual points & sound, then LIVE score increment on chip landing
-            if (mark === 'correct') {
-              this.floatPointsFromTile(tile, +2, 'green');
-              AudioFX.ding();
-            } else if (mark === 'present') {
-              this.floatPointsFromTile(tile, +1, 'yellow');
+            // Points awarding with per-letter-per-occurrence cap:
+            if (mark === 'correct' || mark === 'present') {
+              const letter = rowLetters[i];
+              const maxForLetter = ansFreq[letter] || 0;
+              const already = awarded[letter] || 0;
+
+              if (already < maxForLetter) {
+                // We are allowed to grant points for this letter occurrence
+                if (mark === 'correct') {
+                  this.floatPointsFromTile(tile, +2, 'green');
+                  AudioFX.ding();
+                } else {
+                  this.floatPointsFromTile(tile, +1, 'yellow');
+                }
+                awarded[letter] = already + 1;
+              }
+              // else: no points (letter already fully “consumed” by prior awards)
             }
           }
         }, delay + 210);
@@ -417,7 +454,7 @@
           setTimeout(()=>{
             chip.style.left = `${sRect.left + sRect.width/2}px`;
             chip.style.top  = `${sRect.top  + sRect.height/2}px`;
-            chip.style.transform = 'translate(-50%, -50%) scale(0.8)'; // <-- FIX 2: matching quotes
+            chip.style.transform = 'translate(-50%, -50%) scale(0.8)';
             chip.style.opacity = '0.0';
           }, 160);
         });
