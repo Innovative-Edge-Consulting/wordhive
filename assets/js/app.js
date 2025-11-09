@@ -44,7 +44,7 @@
     const [y,m] = ymd.split('-');
     return `${y}-${m}`;
   }
-  function daysBetween(a,b){ // a,b: 'YYYY-MM-DD', return integer difference b - a
+  function daysBetween(a,b){
     const [ay,am,ad] = a.split('-').map(Number);
     const [by,bm,bd] = b.split('-').map(Number);
     const da = new Date(ay,am-1,ad);
@@ -69,20 +69,11 @@
         best: 0,
         lastPlayDay: null,
         markedToday: false,
-
-        // NEW: streak UX metadata
         milestones: [3,7,14,30,50,100],
         lastMilestoneShown: 0,
-
-        // NEW: freeze system
-        // available: number of unused freezes
-        // earnedMonths: list of 'YYYY-MM' months where 1 freeze was earned
-        // usedDays: dates 'YYYY-MM-DD' when a freeze was consumed
         available: 0,
         earnedMonths: [],
         usedDays: [],
-
-        // NEW: toast control
         toastDayShown: null
       }
     };
@@ -94,14 +85,11 @@
     st.best = Number(st.best || 0);
     st.lastPlayDay = st.lastPlayDay || null;
     st.markedToday = !!st.markedToday;
-
     if (!Array.isArray(st.milestones)) st.milestones = [3,7,14,30,50,100];
     st.lastMilestoneShown = Number(st.lastMilestoneShown || 0);
-
     st.available = Number(st.available || 0);
     if (!Array.isArray(st.earnedMonths)) st.earnedMonths = [];
     if (!Array.isArray(st.usedDays)) st.usedDays = [];
-
     st.toastDayShown = st.toastDayShown || null;
     return st;
   }
@@ -116,12 +104,10 @@
 
       const today = todayKey();
       if (parsed.day !== today) {
-        // New calendar day: reset run (but keep streak progression logic at markPlayedToday)
         parsed.day = today;
         parsed.score = 0;
         parsed.levelIndex = 0;
         parsed.streak.markedToday = false;
-        // don't reset toastDayShown yet; we'll use it to avoid double toasts if already shown
       }
       if (parsed.levelLen && parsed.levelIndex == null) {
         const idx = Math.max(0, LEVEL_LENGTHS.indexOf(parsed.levelLen));
@@ -140,13 +126,11 @@
   function saveStore(s){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(s)); }catch{} }
 
   // Mark "played today" + handle freeze & milestones.
-  // Returns details to drive UI toasts.
   function markPlayedToday(store) {
     const today = todayKey();
     const st = store.streak = migrateStreak(store.streak);
     const last = st.lastPlayDay;
 
-    // Already marked today?
     if (st.markedToday && last === today) {
       return { changed:false };
     }
@@ -156,35 +140,26 @@
     let newBest = false;
     let milestone = null;
 
-    // Determine how to progress current streak
     if (last === today) {
-      // same day, not expected (handled above), but keep idempotent
       st.markedToday = true;
     } else if (last === dateMinus(today, 1)) {
-      // consecutive
       st.current = (st.current || 0) + 1;
     } else {
-      // gap of 1 day? (missed exactly one day)
       if (last && daysBetween(last, today) === 2 && st.available > 0) {
-        // consume one freeze
         st.available = Math.max(0, st.available - 1);
         st.usedDays.push(today);
         usedFreeze = true;
-        // continue the streak as if consecutive
         st.current = (st.current || 0) + 1;
       } else {
-        // too long a gap or no freeze: reset
         st.current = 1;
       }
     }
 
-    // Update best
     if ((st.current || 0) > (st.best || 0)) {
       st.best = st.current;
       newBest = true;
     }
 
-    // Earn monthly freeze at day 7 (first time per month)
     if (st.current >= 7) {
       const mk = monthKey(today);
       if (!st.earnedMonths.includes(mk)) {
@@ -194,7 +169,6 @@
       }
     }
 
-    // Milestone check (one-time per milestone value)
     for (const m of st.milestones) {
       if (st.current >= m && st.lastMilestoneShown < m) {
         milestone = m;
@@ -202,11 +176,9 @@
     }
     if (milestone) st.lastMilestoneShown = milestone;
 
-    // finalize day marking
     st.lastPlayDay = today;
     st.markedToday = true;
 
-    // control toast (only once per day)
     const showToast = st.toastDayShown !== today;
     if (showToast) st.toastDayShown = today;
 
@@ -243,7 +215,6 @@
       if (!isFinite(d) || d === 0) return;
       store.score = Math.max(0, (store.score || 0) + d);
       saveStore(store);
-      // Refresh HUD immediately
       if (window.WordscendUI) {
         window.WordscendUI.setHUD(`Level ${store.levelIndex+1}/4`, store.score, store.streak.current);
       }
@@ -274,17 +245,14 @@
 
     const qp = getParams();
 
-    // QA: end card preview
     if (qp.endcard === '1') {
       mountBlankStage();
       window.WordscendUI.showEndCard(store.score, store.streak.current, store.streak.best);
       return;
     }
 
-    // Start the requested/current level
     await startLevel(store.levelIndex);
 
-    // On-demand modals for QA:
     if (qp.intro === '1') window.WordscendUI.showRulesModal();
     if (qp.settings === '1') window.WordscendUI.showSettingsModal();
 
@@ -304,22 +272,17 @@
       window.WordscendEngine.setAnswer(answer);
       const cfg = window.WordscendEngine.init({ rows:6, cols: levelLen });
 
-      // Mount UI
       window.WordscendUI.mount(root, cfg);
       window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
 
-      // Wrap submit for streak + level chaining + score table
       const origSubmit = window.WordscendEngine.submitRow.bind(window.WordscendEngine);
       window.WordscendEngine.submitRow = function(){
         const res = origSubmit();
 
-        // Count "played" on any valid processed row (first time only)
         if (res && res.ok) {
           const stInfo = markPlayedToday(store);
           if (stInfo && stInfo.changed) {
             window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
-
-            // Welcome/milestone/freeze toast
             if (stInfo.showToast) {
               window.WordscendUI.showStreakToast(store.streak.current, {
                 usedFreeze: stInfo.usedFreeze,
@@ -337,7 +300,6 @@
             const attempt = res.attempt ?? 6;
             const gained = SCORE_TABLE[Math.min(Math.max(attempt,1),6) - 1] || 0;
 
-            // Add per-level bonus on top of live chip points
             store.score += gained;
             saveStore(store);
 
@@ -348,7 +310,6 @@
             setTimeout(() => {
               if (isLast) {
                 window.WordscendUI.showEndCard(store.score, store.streak.current, store.streak.best);
-                // Prepare for next day's run (do NOT reset on refresh)
                 store.day = todayKey();
                 store.score = 0;
                 store.levelIndex = 0;
@@ -361,7 +322,6 @@
             }, 1200);
 
           } else {
-            // Fail: retry same level
             window.WordscendUI.showBubble('Out of tries. Try again');
             saveStore(store);
             setTimeout(() => startLevel(idx), 1200);
