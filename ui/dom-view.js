@@ -93,87 +93,95 @@
 
   const UI = {
     mount(rootEl, config) {
-      if (!rootEl) { console.warn('[Wordscend] No mount element provided.'); return; }
-      this.root = rootEl;
-      this.config = config;
+      try {
+        if (!rootEl) { console.warn('[Wordscend] No mount element provided.'); return; }
+        this.root = rootEl;
+        this.config = config || { rows:6, cols:5 };
 
-      // Ensure theme is applied on mount
-      Theme.apply(Theme.getPref());
+        // Ensure theme is applied on mount
+        Theme.apply(Theme.getPref());
 
-      // App backdrop (overrides Webflow bg)
-      if (!document.querySelector('.ws-page-bg')) {
-        const bg = document.createElement('div');
-        bg.className = 'ws-page-bg';
-        document.body.appendChild(bg);
-      }
+        // App backdrop (overrides Webflow bg)
+        if (!document.querySelector('.ws-page-bg')) {
+          const bg = document.createElement('div');
+          bg.className = 'ws-page-bg';
+          document.body.appendChild(bg);
+        }
 
-      // Topbar + HUD + Stage + Grid + Keyboard
-      this.root.innerHTML = `
-        <div class="ws-topbar">
-          <div class="ws-topbar-inner">
-            <div class="ws-brand" role="banner" aria-label="Wordscend">
-              <span class="dot"></span> Wordscend
-            </div>
-            <div class="ws-actions">
-              <button class="icon-btn" id="ws-info" type="button" title="How to play" aria-label="How to play">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
-                  <path d="M12 8.5h.01M11 11.5h1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </button>
-              <button class="icon-btn" id="ws-settings" type="button" title="Settings" aria-label="Settings">
-                <!-- ✅ Gear scaled & padded so it never crops -->
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <g transform="translate(1 1) scale(0.92)">
+        // Topbar + HUD + Stage + Grid + Keyboard
+        this.root.innerHTML = `
+          <div class="ws-topbar">
+            <div class="ws-topbar-inner">
+              <div class="ws-brand" role="banner" aria-label="Wordscend">
+                <span class="dot"></span> Wordscend
+              </div>
+              <div class="ws-actions">
+                <button class="icon-btn" id="ws-info" type="button" title="How to play" aria-label="How to play">
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M12 8.5h.01M11 11.5h1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <button class="icon-btn" id="ws-settings" type="button" title="Settings" aria-label="Settings">
+                  <!-- Safer gear: viewBox padded to avoid stroke cropping, no transforms -->
+                  <svg viewBox="-1 -1 26 26" fill="none" aria-hidden="true">
                     <path d="M19.4 13.1a7.9 7.9 0 0 0 0-2.2l2-1.5-1.6-2.7-2.4.9a8 8 0 0 0-1.9-1.1l-.3-2.5h-3.2l-.3 2.5c-.7.2-1.3.6-1.9 1.1l-2.4-.9-1.6 2.7 2 1.5a7.9 7.9 0 0 0 0 2.2l-2 1.5 1.6 2.7 2.4-.9c.6.5 1.2.8 1.9 1.1l.3 2.5h3.2l.3-2.5c.7-.2 1.3-.6 1.9-1.1l2.4.9 1.6-2.7-2-1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                     <circle cx="12" cy="12" r="3.5" stroke="currentColor" stroke-width="1.5"/>
-                  </g>
-                </svg>
-              </button>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="ws-hud">
-          <div class="ws-tag" id="ws-level">Level: -</div>
-          <div class="ws-hud-right">
-            <div class="ws-tag" id="ws-score">Score: 0</div>
-            <div class="ws-tag" id="ws-streak" title="Daily play streak">🔥 Streak 0</div>
+          <div class="ws-hud">
+            <div class="ws-tag" id="ws-level">Level: -</div>
+            <div class="ws-hud-right">
+              <div class="ws-tag" id="ws-score">Score: 0</div>
+              <div class="ws-tag" id="ws-streak" title="Daily play streak">🔥 Streak 0</div>
+            </div>
           </div>
-        </div>
 
-        <div class="ws-stage">
-          <div class="ws-bubble" id="ws-bubble"></div>
-          <div class="ws-grid" aria-label="Game grid"></div>
-        </div>
+          <div class="ws-stage">
+            <div class="ws-bubble" id="ws-bubble"></div>
+            <div class="ws-grid" aria-label="Game grid"></div>
+          </div>
 
-        <div class="ws-kb" aria-label="On-screen keyboard"></div>
-      `;
+          <div class="ws-kb" aria-label="On-screen keyboard"></div>
+        `;
 
-      // Cache refs
-      this.levelEl = this.root.querySelector('#ws-level');
-      this.scoreEl = this.root.querySelector('#ws-score');
-      this.streakEl= this.root.querySelector('#ws-streak');
-      this.stageEl = this.root.querySelector('.ws-stage');
-      this.gridEl  = this.root.querySelector('.ws-grid');
-      this.kbEl    = this.root.querySelector('.ws-kb');
-      this.bubble  = this.root.querySelector('#ws-bubble');
+        // Cache refs
+        this.levelEl = this.root.querySelector('#ws-level');
+        this.scoreEl = this.root.querySelector('#ws-score');
+        this.streakEl= this.root.querySelector('#ws-streak');
+        this.stageEl = this.root.querySelector('.ws-stage');
+        this.gridEl  = this.root.querySelector('.ws-grid');
+        this.kbEl    = this.root.querySelector('.ws-kb');
+        this.bubble  = this.root.querySelector('#ws-bubble');
 
-      // Build grid + keyboard
-      this.renderGrid();
-      this.renderKeyboard();
+        // Build grid + keyboard
+        this.renderGrid();
+        this.renderKeyboard();
 
-      // Bind header actions
-      this.bindHeader();
+        // Bind header actions
+        this.bindHeader();
 
-      // Bind physical keyboard ONCE per page
-      this.bindKeyboard();
+        // Bind physical keyboard ONCE per page
+        this.bindKeyboard();
 
-      // Re-bind on-screen keyboard EACH mount
-      this._kbClickBound = false;
-      this.bindKbClicks();
+        // Re-bind on-screen keyboard EACH mount
+        this._kbClickBound = false;
+        this.bindKbClicks();
 
-      console.log('[Wordscend] UI mounted:', config.rows, 'rows ×', config.cols);
+        console.log('[Wordscend] UI mounted:', this.config.rows, 'rows ×', this.config.cols);
+      } catch (e) {
+        console.error('[Wordscend UI] mount error:', e);
+        if (this.root) {
+          this.root.innerHTML = `
+            <div style="margin:24px 0;font:600 14px system-ui;color:var(--text);opacity:.9;">
+              Oops—UI failed to load. Please refresh.
+            </div>`;
+        }
+      }
     },
 
     setHUD(levelText, score, streak){
@@ -186,12 +194,13 @@
     bindHeader(){
       const info = this.root.querySelector('#ws-info');
       const settings = this.root.querySelector('#ws-settings');
-      info.addEventListener('click', ()=> this.showRulesModal());
-      settings.addEventListener('click', ()=> this.showSettingsModal());
+      info?.addEventListener('click', ()=> this.showRulesModal());
+      settings?.addEventListener('click', ()=> this.showSettingsModal());
     },
 
     /* ---------- Rendering ---------- */
     renderGrid() {
+      if (!global.WordscendEngine || !this.gridEl) return;
       const board  = global.WordscendEngine.getBoard();
       const marks  = global.WordscendEngine.getRowMarks();
       const cursor = global.WordscendEngine.getCursor();
@@ -229,6 +238,7 @@
     },
 
     renderKeyboard() {
+      if (!this.kbEl || !global.WordscendEngine) return;
       const status = global.WordscendEngine.getKeyStatus();
       this.kbEl.innerHTML = '';
 
@@ -311,6 +321,7 @@
     },
 
     handleInput(key) {
+      if (!global.WordscendEngine) return;
       if (/^[A-Za-z]$/.test(key)) {
         if (global.WordscendEngine.addLetter(key)) {
           this.renderGrid();
@@ -359,8 +370,8 @@
 
     /* ---------- Animations & Helpers ---------- */
     flipRevealRow(rowIndex, marks) {
-      const rows = this.gridEl.querySelectorAll('.ws-row');
-      const rowEl = rows[rowIndex];
+      const rows = this.gridEl?.querySelectorAll('.ws-row');
+      const rowEl = rows?.[rowIndex];
       if (!rowEl) return;
 
       const tiles = Array.from(rowEl.querySelectorAll('.ws-tile'));
@@ -389,9 +400,10 @@
     },
 
     shakeCurrentRow() {
-      const cursor = global.WordscendEngine.getCursor();
-      const rows = this.gridEl.querySelectorAll('.ws-row');
-      const rowEl = rows[cursor.row];
+      const cursor = global.WordscendEngine?.getCursor();
+      if (!cursor) return;
+      const rows = this.gridEl?.querySelectorAll('.ws-row');
+      const rowEl = rows?.[cursor.row];
       if (!rowEl) return;
       rowEl.classList.remove('shake'); void rowEl.offsetWidth;
       rowEl.classList.add('shake');
@@ -427,7 +439,7 @@
           const midX = (tRect.left + sRect.left)/2;
           const midY = Math.min(tRect.top, sRect.top) - 40;
 
-        chip.style.transitionTimingFunction = 'cubic-bezier(.22,.82,.25,1)';
+          chip.style.transitionTimingFunction = 'cubic-bezier(.22,.82,.25,1)';
           chip.style.left = `${midX}px`;
           chip.style.top  = `${midY}px`;
           chip.style.transform = 'translate(-50%, -50%) scale(1.05)';
