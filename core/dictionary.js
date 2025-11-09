@@ -2,9 +2,7 @@
 (function (global) {
   const Dict = {
     _allowedSet: new Set(),
-    _answers: {
-      4: [], 5: [], 6: [], 7: []
-    },
+    _answers: { 4: [], 5: [], 6: [], 7: [] },
 
     async loadDWYL(url, opts = {}) {
       const minLen = opts.minLen ?? 4;
@@ -40,7 +38,6 @@
       const day = d.getDate();
       const key = `${y}-${m}-${day}`;
 
-      // simple FNV-1a style hash
       let h = 2166136261;
       for (let i = 0; i < key.length; i++) {
         h ^= key.charCodeAt(i);
