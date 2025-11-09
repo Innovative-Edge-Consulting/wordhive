@@ -250,7 +250,6 @@
             btn.textContent = '⌫'; btn.setAttribute('data-key','Backspace'); btn.setAttribute('aria-label','Backspace'); btn.title='Backspace';
           } else {
             btn.textContent = key; btn.setAttribute('data-key', key);
-            btn.setAttribute('aria-label', key); // a11y
           }
 
           const s = status[btn.getAttribute('data-key')];
@@ -304,7 +303,7 @@
 
         this.flipRevealRow(res.attempt - 1, res.marks);
         this.renderKeyboard();
-        // Removed extra renderGrid() here to avoid double-refresh flicker
+        if (res.done){ setTimeout(()=> this.renderGrid(), 420 + (this.config.cols - 1) * 80); }
         if (res.ok && global.WordscendApp_onStateChange){ global.WordscendApp_onStateChange({ type:'submit', result:res }); }
       }
     },
@@ -397,11 +396,8 @@
 
         setTimeout(()=>{
           chip.remove();
-          // Visual-only chip: no score mutation here to avoid double-counting.
-          if (this.scoreEl){
-            this.scoreEl.classList.remove('pulse'); void this.scoreEl.offsetWidth; this.scoreEl.classList.add('pulse');
-            setTimeout(()=> this.scoreEl.classList.remove('pulse'), 260);
-          }
+          if (typeof window.WordscendApp_addScore === 'function'){ window.WordscendApp_addScore(delta); }
+          if (this.scoreEl){ this.scoreEl.classList.remove('pulse'); void this.scoreEl.offsetWidth; this.scoreEl.classList.add('pulse'); setTimeout(()=> this.scoreEl.classList.remove('pulse'), 260); }
         }, 480);
       }catch{}
     },
@@ -495,7 +491,7 @@
               '<input id="ws-sound" type="checkbox"'+(sound?' checked':'')+'>'+
             '</div>'+
             '<div class="ws-field">'+
-              <label for="ws-cb">Colorblind hints</label>'+
+              '<label for="ws-cb">Colorblind hints</label>'+
               '<input id="ws-cb" type="checkbox"'+(colorblind?' checked':'')+'>'+
             '</div>'+
           '</div>'+
