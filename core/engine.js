@@ -33,6 +33,7 @@
   function getCursor(){ return { row: STATE.cursor.row, col: STATE.cursor.col }; }
   function isDone(){ return STATE.done; }
   function getKeyStatus(){ return { ...STATE.keyStatus }; }
+  function getAnswer(){ return STATE.answer; } // <-- new
 
   function addLetter(ch) {
     if (STATE.done) return false;
@@ -139,7 +140,6 @@
 
   /* ---------- Persistence helpers ---------- */
   function snapshot() {
-    // Deep-ish copy to avoid external mutation
     return {
       rows: STATE.rows,
       cols: STATE.cols,
@@ -161,7 +161,6 @@
 
       STATE.rows = s.rows;
       STATE.cols = s.cols;
-      // Normalize board/marks to correct sizes
       STATE.board = Array.from({ length: STATE.rows }, (_, r) => {
         const src = s.board[r] || [];
         const row = Array.from({ length: STATE.cols }, (_, c) => (src[c] || '').toString().toUpperCase());
@@ -190,7 +189,7 @@
     init, setAnswer, setAllowed,
     getBoard, getRowMarks, getCursor, isDone,
     addLetter, backspace, submitRow,
-    getKeyStatus,
+    getKeyStatus, getAnswer,
     snapshot, hydrate
   };
 })(window);
