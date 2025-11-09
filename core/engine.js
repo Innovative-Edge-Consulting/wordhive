@@ -35,6 +35,73 @@
 
   function getKeyStatus(){ return { ...STATE.keyStatus }; }
 
+  function serializeState() {
+    return {
+      rows: STATE.rows,
+      cols: STATE.cols,
+      board: STATE.board.map(row => row.map(ch => (ch || '').toUpperCase())),
+      rowMarks: STATE.rowMarks.map(row => row.map(mark => (mark === 'correct' || mark === 'present' || mark === 'absent') ? mark : null)),
+      cursor: { row: STATE.cursor.row, col: STATE.cursor.col },
+      done: STATE.done,
+      win: STATE.win,
+      answer: STATE.answer,
+      keyStatus: { ...STATE.keyStatus }
+    };
+  }
+
+  function hydrateState(saved) {
+    if (!saved || typeof saved !== 'object') return false;
+    if (saved.rows !== STATE.rows || saved.cols !== STATE.cols) return false;
+
+    try {
+      const board = Array.from({ length: STATE.rows }, (_, r) => {
+        const row = Array.isArray(saved.board?.[r]) ? saved.board[r] : [];
+        return Array.from({ length: STATE.cols }, (_, c) => {
+          const ch = row[c];
+          if (typeof ch === 'string' && /^[A-Za-z]$/.test(ch.charAt(0))) {
+            return ch.charAt(0).toUpperCase();
+          }
+          return '';
+        });
+      });
+
+      const rowMarks = Array.from({ length: STATE.rows }, (_, r) => {
+        const row = Array.isArray(saved.rowMarks?.[r]) ? saved.rowMarks[r] : [];
+        return Array.from({ length: STATE.cols }, (_, c) => {
+          const mark = row[c];
+          return (mark === 'correct' || mark === 'present' || mark === 'absent') ? mark : null;
+        });
+      });
+
+      const cursorRow = Math.min(Math.max(parseInt(saved.cursor?.row, 10) || 0, 0), STATE.rows - 1);
+      const cursorCol = Math.min(Math.max(parseInt(saved.cursor?.col, 10) || 0, 0), STATE.cols);
+
+      const keyStatus = {};
+      if (saved.keyStatus && typeof saved.keyStatus === 'object') {
+        Object.entries(saved.keyStatus).forEach(([key, val]) => {
+          const upper = String(key || '').toUpperCase();
+          if (!/^[A-Z]$/.test(upper)) return;
+          if (val === 'correct' || val === 'present' || val === 'absent') {
+            keyStatus[upper] = val;
+          }
+        });
+      }
+
+      STATE.board = board;
+      STATE.rowMarks = rowMarks;
+      STATE.cursor = { row: cursorRow, col: cursorCol };
+      STATE.done = !!saved.done;
+      STATE.win = !!saved.win;
+      if (typeof saved.answer === 'string' && saved.answer) {
+        STATE.answer = saved.answer.toUpperCase();
+      }
+      STATE.keyStatus = keyStatus;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   function addLetter(ch) {
     if (STATE.done) return false;
     ch = (ch || '').toUpperCase();
@@ -149,6 +216,6 @@
     init, setAnswer, setAllowed,
     getBoard, getRowMarks, getCursor, isDone,
     addLetter, backspace, submitRow,
-    getKeyStatus
+    getKeyStatus, serializeState, hydrateState
   };
 })(window);
