@@ -34,7 +34,7 @@
   function isDone(){ return STATE.done; }
   function getKeyStatus(){ return { ...STATE.keyStatus }; }
 
-  // ---- NEW: snapshot/hydrate for progress persistence ----
+  // ---- snapshot/hydrate for progress persistence ----
   function snapshot(){
     return {
       rows: STATE.rows,
@@ -58,7 +58,6 @@
     STATE.rows = rows;
     STATE.cols = cols;
 
-    // validate shapes; if mismatch, bail to clean init shape
     const okBoard = Array.isArray(snap.board) && snap.board.length === rows && snap.board.every(r => Array.isArray(r) && r.length === cols);
     const okMarks = Array.isArray(snap.rowMarks) && snap.rowMarks.length === rows && snap.rowMarks.every(r => Array.isArray(r) && r.length === cols);
 
@@ -79,7 +78,6 @@
       }
     }
   }
-  // --------------------------------------------------------
 
   function addLetter(ch) {
     if (STATE.done) return false;
@@ -105,7 +103,6 @@
     const ans = STATE.answer.split('');
     const g = guess.slice();
 
-    // mark counts for answer letters
     const counts = {};
     ans.forEach(ch => { counts[ch] = (counts[ch] || 0) + 1; });
 
