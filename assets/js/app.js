@@ -55,6 +55,25 @@
     return Math.round((db-da)/86400000);
   }
 
+  /* ---------------- Filtering (strong) ---------------- */
+  // Scrub DWYL list to remove junk like OOOO, MMMM, etc.
+  function scrubAllowed(originalSet, { minLen=4, maxLen=7 } = {}) {
+    const out = new Set();
+    for (const w of originalSet || []) {
+      const up = String(w || '').trim().toUpperCase();
+      // A–Z only after trim
+      if (!/^[A-Z]+$/.test(up)) continue;
+      if (up.length < minLen || up.length > maxLen) continue;
+      // reject words with only one unique letter (e.g., OOOO / AAAAAA)
+      const uniq = new Set(up);
+      if (uniq.size < 2) continue;
+      // reject 3+ identical letters in a row (e.g., OOO, AAAA)
+      if (/(.)\1{2,}/.test(up)) continue;
+      out.add(up);
+    }
+    return out;
+  }
+
   /* ---------------- Config ---------------- */
   const BASE = 'https://innovative-edge-consulting.github.io/web-games';
   const ALLOWED_URL = 'https://raw.githubusercontent.com/dwyl/english-words/master/words.txt';
@@ -104,7 +123,6 @@
         parsed.score = 0;
         parsed.levelIndex = 0;
         parsed.streak.markedToday = false;
-        // keep progress object; stale days are ignored by the restore gate
       }
       if (parsed.levelLen && parsed.levelIndex == null) {
         const idx = Math.max(0, LEVEL_LENGTHS.indexOf(parsed.levelLen));
@@ -210,15 +228,20 @@
 
   (async () => {
     // load order matters
-    await loadAny([`${BASE}/core/engine.js?v=state1`, `/core/engine.js?v=state1`]);
-    await loadAny([`${BASE}/ui/dom-view.js?v=state1`, `/ui/dom-view.js?v=state1`]);
-    await loadAny([`${BASE}/core/dictionary.js?v=state1`, `/core/dictionary.js?v=state1`]);
+    await loadAny([`${BASE}/core/engine.js?v=state2`, `/core/engine.js?v=state2`]);
+    await loadAny([`${BASE}/ui/dom-view.js?v=state2`, `/ui/dom-view.js?v=state2`]);
+    await loadAny([`${BASE}/core/dictionary.js?v=state2`, `/core/dictionary.js?v=state2`]);
 
-    const { allowedSet } = await window.WordscendDictionary.loadDWYL(ALLOWED_URL, { minLen: 4, maxLen: 7 }).catch(()=>{
-      const fallback = ['TREE','CAMP','WATER','STONE','LIGHT','BRAVE','FAMILY','MARKET','GARDEN','PLANET'];
-      window.WordscendDictionary._allowedSet = new Set(fallback);
-      return { allowedSet: window.WordscendDictionary._allowedSet };
-    });
+    // Load, then scrub
+    let { allowedSet } = await window.WordscendDictionary
+      .loadDWYL(ALLOWED_URL, { minLen: 4, maxLen: 7 })
+      .catch(() => {
+        const fallback = ['TREE','CAMP','WATER','STONE','LIGHT','BRAVE','FAMILY','MARKET','GARDEN','PLANET'];
+        window.WordscendDictionary._allowedSet = new Set(fallback);
+        return { allowedSet: window.WordscendDictionary._allowedSet };
+      });
+
+    allowedSet = scrubAllowed(allowedSet, { minLen: 4, maxLen: 7 });
 
     const qp = getParams();
 
@@ -229,7 +252,7 @@
       return;
     }
 
-    // Start the requested/current level (with restore)
+    // Start current level (with restore)
     await startLevel(store.levelIndex);
 
     // On-demand modals for QA:
@@ -247,18 +270,16 @@
     async function startLevel(idx){
       const levelLen = LEVEL_LENGTHS[idx];
 
-      const curated = window.WordscendDictionary.answersOfLength(levelLen);
-      const list = curated && curated.length
-        ? curated
-        : Array.from(allowedSet).filter(w => w.length === levelLen);
+      // 🔒 Use only the scrubbed allowed list, filtered by length
+      const list = Array.from(allowedSet).filter(w => w.length === levelLen);
 
+      // Daily answer from scrubbed pool only
       const answer = window.WordscendDictionary.pickToday(list);
 
-      // Initialize engine
-      // ✅ Use the local allowedSet (works even if DWYL fetch fell back)
+      // Initialize engine with scrubbed set
       window.WordscendEngine.setAllowed(allowedSet);
       window.WordscendEngine.setAnswer(answer);
-      const cfg = window.WordscendEngine.init({ rows:6, cols: levelLen });
+      window.WordscendEngine.init({ rows:6, cols: levelLen });
 
       // ---- Restore progress if same day & same level length ----
       const restorePack = store.progress[levelLen];
@@ -266,7 +287,6 @@
         try{
           window.WordscendEngine.hydrate(restorePack.state, { rows:6, cols:levelLen });
         }catch(e){
-          // If hydrate fails due to mismatch, clear stale
           clearProgressForLen(levelLen);
         }
       }
@@ -313,12 +333,11 @@
 
             const isLast = (idx === LEVEL_LENGTHS.length - 1);
             setTimeout(() => {
-              // Clear progress for the level we just finished
               clearProgressForLen(levelLen);
 
               if (isLast) {
                 window.WordscendUI.showEndCard(store.score, store.streak.current, store.streak.best);
-                // Reset score/level for next day’s run (streak persists)
+                // Reset for next day's run
                 store.day = todayKey();
                 store.score = 0;
                 store.levelIndex = 0;
@@ -347,8 +366,7 @@
       window.WordscendUI.setHUD(`Level ${store.levelIndex+1}/4`, store.score, store.streak.current);
     }
 
-    // Also persist on key letters/backspace steps triggered from UI
-    // (UI already calls WordscendApp_onStateChange; this is a safety timer for any missed events)
+    // Persist safety
     window.addEventListener('beforeunload', () => {
       try{ window.WordscendApp_onStateChange && window.WordscendApp_onStateChange(); }catch{}
     });
