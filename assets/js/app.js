@@ -1,9 +1,5 @@
 // /assets/js/app.js
 (function () {
-  // Prevent accidental double-boot if included twice
-  if (window.__wordscendBooted) { console.warn('[Wordscend] already booted'); return; }
-  window.__wordscendBooted = true;
-
   /* ---------------- Utilities ---------------- */
   function loadScript(src) {
     return new Promise((resolve, reject) => {
@@ -28,23 +24,12 @@
     };
   }
 
-  // Toronto-anchored date key so the daily stays consistent
-  function todayKey(){
-    try{
-      const d = new Date();
-      const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone:'America/Toronto',
-        year:'numeric', month:'2-digit', day:'2-digit'
-      }).formatToParts(d);
-      const y = parts.find(p=>p.type==='year').value;
-      const m = parts.find(p=>p.type==='month').value;
-      const da= parts.find(p=>p.type==='day').value;
-      return `${y}-${m}-${da}`;
-    }catch{
-      const d = new Date();
-      const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const da=String(d.getDate()).padStart(2,'0');
-      return `${y}-${m}-${da}`;
-    }
+  function todayKey() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${da}`;
   }
   function dateMinus(ymd, n){
     const [y,m,d] = ymd.split('-').map(Number);
@@ -60,6 +45,7 @@
   const BASE = 'https://innovative-edge-consulting.github.io/web-games';
   const ALLOWED_URL = 'https://raw.githubusercontent.com/dwyl/english-words/master/words.txt';
   const SCORE_TABLE = [100, 70, 50, 35, 25, 18]; // per-level bonus
+  const LEVEL_LENGTHS = [4, 5, 6, 7];
   const STORE_KEY = 'wordscend_v3';
 
   function defaultStore() {
@@ -67,7 +53,8 @@
       day: todayKey(),
       score: 0,
       levelIndex: 0,
-      streak: { current: 0, best: 0, lastPlayDay: null, markedToday: false }
+      streak: { current: 0, best: 0, lastPlayDay: null, markedToday: false },
+      progress: {} // per-level snapshots (by numeric index)
     };
   }
 
@@ -83,18 +70,23 @@
       parsed.streak.lastPlayDay = parsed.streak.lastPlayDay || null;
       parsed.streak.markedToday = !!parsed.streak.markedToday;
 
+      if (!parsed.progress || typeof parsed.progress !== 'object') {
+        parsed.progress = {};
+      }
+
       const today = todayKey();
       if (parsed.day !== today) {
+        // New day: reset session state and clear progress
         parsed.day = today;
         parsed.score = 0;
         parsed.levelIndex = 0;
         parsed.streak.markedToday = false;
+        parsed.progress = {};
       }
-      // Legacy migration: convert levelLen to levelIndex (if present)
-      if (parsed.levelLen != null && parsed.levelIndex == null) {
-        const lengths = [4,5,6,7];
-        const i2 = lengths.indexOf(parsed.levelLen);
-        parsed.levelIndex = (i2 === -1 ? 0 : i2);
+
+      if (parsed.levelLen && parsed.levelIndex == null) {
+        const idx = Math.max(0, LEVEL_LENGTHS.indexOf(parsed.levelLen));
+        parsed.levelIndex = (idx === -1) ? 0 : idx;
         delete parsed.levelLen;
       }
       parsed.levelIndex = Number.isInteger(parsed.levelIndex) ? parsed.levelIndex : 0;
@@ -138,6 +130,41 @@
     return store;
   }
 
+  /* ---------- Progress persistence helpers ---------- */
+  function clearProgress(levelIdx) {
+    try {
+      if (store.progress && store.progress[levelIdx] != null) {
+        delete store.progress[levelIdx];
+        saveStore(store);
+      }
+    } catch {}
+  }
+
+  function saveProgress(levelIdx, answer) {
+    try {
+      if (!window.WordscendEngine?.snapshot) return;
+      const snap = window.WordscendEngine.snapshot();
+      // attach answer (for validation) + a very small schema flag
+      const payload = { ...snap, answer, v: 1 };
+      store.progress[levelIdx] = payload;
+      saveStore(store);
+    } catch {}
+  }
+
+  function tryRestoreProgress(levelIdx, expectedAnswer, expectedCols) {
+    try {
+      const payload = store.progress?.[levelIdx];
+      if (!payload || !window.WordscendEngine?.hydrate) return false;
+      if (payload.v !== 1) return false; // version mismatch guard
+      if (payload.answer !== expectedAnswer) return false;
+      if (payload.cols !== expectedCols) return false;
+      // hydrate the engine state
+      return window.WordscendEngine.hydrate(payload) === true;
+    } catch {
+      return false;
+    }
+  }
+
   /* ---------------- Bootstrap ---------------- */
   const root = document.getElementById('game') || document.body;
   root.innerHTML = '<div style="margin:24px 0;font:600 14px system-ui;color:#fff;opacity:.8;">Loading word list…</div>';
@@ -159,15 +186,22 @@
     } catch {}
   };
 
+  // Save progress after every user interaction the UI notifies about
+  window.WordscendApp_onStateChange = function(){
+    try {
+      // We’ll re-save with the most recent answer cached in closure
+      if (currentAnswer != null) saveProgress(store.levelIndex, currentAnswer);
+    } catch {}
+  };
+
+  let currentAnswer = null; // cache the active answer for save hooks
+
   Promise.all([
     loadScript(`${BASE}/core/engine.js?v=header-1`),
     loadScript(`${BASE}/ui/dom-view.js?v=header-1`),
     loadScript(`${BASE}/core/dictionary.js?v=header-1`)
   ])
   .then(async () => {
-    // One source of truth for level lengths (from engine)
-    const LEVEL_LENGTHS = (window.WordscendEngine.getLevelLengths && window.WordscendEngine.getLevelLengths()) || [4,5,6,7];
-
     const { allowedSet } = await window.WordscendDictionary.loadDWYL(ALLOWED_URL, {
       minLen: 4, maxLen: 7
     });
@@ -191,7 +225,8 @@
 
     /* ------------ functions ------------ */
     async function startLevel(idx){
-      const levelLen = LEVEL_LENGTHS[idx];
+      const levelLens = [4,5,6,7];
+      const levelLen = levelLens[idx];
 
       const curated = window.WordscendDictionary.answersOfLength(levelLen);
       const list = curated && curated.length
@@ -199,14 +234,28 @@
         : Array.from(allowedSet).filter(w => w.length === levelLen);
 
       const answer = window.WordscendDictionary.pickToday(list);
+      currentAnswer = answer;
 
       window.WordscendEngine.setAllowed(allowedSet);
-      window.WordscendEngine.setAnswer(answer);
+
+      // init blank state (will be immediately hydrated if progress exists)
       const cfg = window.WordscendEngine.init({ rows:6, cols: levelLen });
+      window.WordscendEngine.setAnswer(answer);
 
+      // Try to restore saved progress (must match answer and size)
+      const restored = tryRestoreProgress(idx, answer, levelLen);
+
+      // Mount UI after engine is in the desired state
       window.WordscendUI.mount(root, cfg);
-      window.WordscendUI.setHUD(`Level ${idx+1}/4 — ${levelLen}-letter`, store.score, store.streak.current);
+      window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
 
+      // If we restored, make sure the visual grid & keyboard reflect it
+      if (restored) {
+        // A render was already performed during mount; ask UI to re-render by sending a no-op change
+        window.WordscendApp_onStateChange?.();
+      }
+
+      // Wrap submitRow to add scoring + flow and manage persistence lifecycle
       const origSubmit = window.WordscendEngine.submitRow.bind(window.WordscendEngine);
       window.WordscendEngine.submitRow = function(){
         const res = origSubmit();
@@ -214,8 +263,10 @@
         // Count "played" on any valid processed row
         if (res && res.ok) {
           if (markPlayedToday(store)) {
-            window.WordscendUI.setHUD(`Level ${idx+1}/4 — ${levelLen}-letter`, store.score, store.streak.current);
+            window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
           }
+          // Save progress after each valid submit
+          saveProgress(idx, answer);
         }
 
         if (res && res.ok && res.done) {
@@ -227,8 +278,11 @@
             store.score += gained;
             saveStore(store);
 
-            window.WordscendUI.setHUD(`Level ${idx+1}/4 — ${levelLen}-letter`, store.score, store.streak.current);
+            window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
             window.WordscendUI.showBubble(`+${gained} pts`);
+
+            // Completed level: clear persisted progress for this level
+            clearProgress(idx);
 
             const isLast = (idx === LEVEL_LENGTHS.length - 1);
             setTimeout(() => {
@@ -238,6 +292,7 @@
                 store.day = todayKey();
                 store.score = 0;
                 store.levelIndex = 0;
+                store.progress = {}; // clear all progress for fresh run
                 saveStore(store);
               } else {
                 store.levelIndex = idx + 1;
@@ -247,11 +302,15 @@
             }, 1200);
 
           } else {
-            // Fail: retry same level
+            // Fail: retry same level fresh — clear progress snapshot
+            clearProgress(idx);
             window.WordscendUI.showBubble('Out of tries. Try again');
             saveStore(store);
             setTimeout(() => startLevel(idx), 1200);
           }
+        } else {
+          // Not done yet — save intermediate progress as well
+          if (res && res.ok) saveProgress(idx, answer);
         }
         return res;
       };
@@ -259,7 +318,7 @@
 
     function mountBlankStage(){
       window.WordscendUI.mount(root, { rows:6, cols:5 });
-      window.WordscendUI.setHUD(`Level 4/4 — 7-letter`, store.score, store.streak.current);
+      window.WordscendUI.setHUD(`Level 4/4`, store.score, store.streak.current);
     }
   })
   .catch(err => {
