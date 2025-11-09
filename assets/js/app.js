@@ -86,7 +86,8 @@
       day: todayKey(),
       score: 0,
       levelIndex: 0,
-      streak: { current: 0, best: 0, lastPlayDay: null, markedToday: false }
+      streak: { current: 0, best: 0, lastPlayDay: null, markedToday: false },
+      progress: {}
     };
   }
 
@@ -102,12 +103,17 @@
       parsed.streak.lastPlayDay = parsed.streak.lastPlayDay || null;
       parsed.streak.markedToday = !!parsed.streak.markedToday;
 
+      if (!parsed.progress || typeof parsed.progress !== 'object') {
+        parsed.progress = {};
+      }
+
       const today = todayKey();
       if (parsed.day !== today) {
         parsed.day = today;
         parsed.score = 0;
         parsed.levelIndex = 0;
         parsed.streak.markedToday = false;
+        parsed.progress = {};
       }
       if (parsed.levelLen && parsed.levelIndex == null) {
         const idx = Math.max(0, LEVEL_LENGTHS.indexOf(parsed.levelLen));
@@ -221,61 +227,114 @@
 
       // Build the per-length answer pool from DWYL once, then pick today's
       const list = Array.from(allowedSet).filter(w => w.length === levelLen);
-      const answer = window.WordscendDictionary.pickToday(list);
+      const todaysAnswer = window.WordscendDictionary.pickToday(list);
+
+      const savedProgress = (store.progress && store.progress[idx]) || null;
+      const savedAnswer = typeof savedProgress?.answer === 'string' ? savedProgress.answer.toUpperCase() : null;
+      const answer = (savedAnswer && savedAnswer.length === levelLen) ? savedAnswer : todaysAnswer;
 
       window.WordscendEngine.setAnswer(answer);
       const cfg = window.WordscendEngine.init({ rows:6, cols: levelLen });
 
+      let restored = false;
+      if (savedProgress && savedAnswer === answer && typeof window.WordscendEngine.hydrateState === 'function') {
+        restored = window.WordscendEngine.hydrateState(savedProgress);
+        if (!restored) {
+          delete store.progress[idx];
+          saveStore(store);
+        }
+      } else if (savedProgress) {
+        delete store.progress[idx];
+        saveStore(store);
+      }
+
       window.WordscendUI.mount(root, cfg);
       window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
 
+      if (restored) {
+        window.WordscendUI.renderGrid();
+        window.WordscendUI.renderKeyboard();
+      }
+
+      const persistState = () => {
+        if (typeof window.WordscendEngine.serializeState !== 'function') return;
+        if (!store.progress || typeof store.progress !== 'object') store.progress = {};
+        store.progress[idx] = window.WordscendEngine.serializeState();
+        saveStore(store);
+      };
+
+      const clearProgress = () => {
+        if (store.progress && store.progress[idx]) {
+          delete store.progress[idx];
+          saveStore(store);
+        }
+      };
+
+      persistState();
+
+      window.WordscendApp_onStateChange = function(info = {}) {
+        if (info && info.clearProgress) {
+          clearProgress();
+          return;
+        }
+        if (info && info.type === 'submit') return;
+        persistState();
+      };
+
       // Intercept submitRow to:
+      // - persist state after every processed guess
       // - mark streak "played today" on any valid processed row
       // - award per-level bonus on win
       const origSubmit = window.WordscendEngine.submitRow.bind(window.WordscendEngine);
       window.WordscendEngine.submitRow = function(){
         const res = origSubmit();
 
-        // Count "played today" on the first valid processed guess
         if (res && res.ok) {
+          persistState();
+
           if (markPlayedToday(store)) {
             window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
           }
-        }
 
-        if (res && res.ok && res.done) {
-          if (res.win) {
-            const attempt = res.attempt ?? 6;
-            const gained  = SCORE_TABLE[Math.min(Math.max(attempt,1),6) - 1] || 0;
+          if (res.done) {
+            if (res.win) {
+              const attempt = res.attempt ?? 6;
+              const gained  = SCORE_TABLE[Math.min(Math.max(attempt,1),6) - 1] || 0;
 
-            // Add per-level bonus on top of live tile points
-            store.score += gained;
-            saveStore(store);
+              // Add per-level bonus on top of live tile points
+              store.score += gained;
+              saveStore(store);
 
-            window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
-            window.WordscendUI.showBubble(`+${gained} pts`);
+              window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
+              window.WordscendUI.showBubble(`+${gained} pts`);
 
-            const isLast = (idx === LEVEL_LENGTHS.length - 1);
-            setTimeout(() => {
-              if (isLast) {
-                window.WordscendUI.showEndCard(store.score, store.streak.current, store.streak.best);
-                // Prepare for next daily (streak persists)
-                store.day = todayKey();
-                store.score = 0;
-                store.levelIndex = 0;
-                saveStore(store);
-              } else {
-                store.levelIndex = idx + 1;
-                saveStore(store);
-                startLevel(store.levelIndex);
-              }
-            }, 1200);
+              const isLast = (idx === LEVEL_LENGTHS.length - 1);
+              setTimeout(() => {
+                clearProgress();
+                if (isLast) {
+                  window.WordscendUI.showEndCard(store.score, store.streak.current, store.streak.best);
+                  // Prepare for next daily (streak persists)
+                  store.day = todayKey();
+                  store.score = 0;
+                  store.levelIndex = 0;
+                  store.progress = {};
+                  saveStore(store);
+                } else {
+                  store.levelIndex = idx + 1;
+                  saveStore(store);
+                  startLevel(store.levelIndex);
+                }
+              }, 1200);
 
-          } else {
-            // Fail: retry same level
-            window.WordscendUI.showBubble('Out of tries. Try again');
-            saveStore(store);
-            setTimeout(() => startLevel(idx), 1200);
+            } else {
+              // Fail: retry same level
+              window.WordscendUI.showBubble('Out of tries. Try again');
+              saveStore(store);
+              setTimeout(() => {
+                clearProgress();
+                startLevel(idx);
+              }, 1200);
+            }
           }
         }
         return res;
@@ -285,6 +344,7 @@
     function mountBlankStage(){
       window.WordscendUI.mount(root, { rows:6, cols:5 });
       window.WordscendUI.setHUD(`Level 4/4`, store.score, store.streak.current);
+      window.WordscendApp_onStateChange = null;
     }
   })
   .catch(err => {
