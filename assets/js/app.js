@@ -14,6 +14,16 @@
     throw lastErr || new Error('All script candidates failed');
   }
 
+  // Build robust URL candidates for subpath hosting (e.g., Webflow)
+  function urlCandidates(rel) {
+    const here = document.currentScript?.src || location.href;
+    return [
+      `${BASE}${rel}`,                 // GitHub Pages base
+      new URL(rel, here).toString(),   // relative to current script
+      `.${rel}`                        // plain relative
+    ];
+  }
+
   function qs() {
     const p = new URLSearchParams(location.search);
     return { level:p.get('level'), endcard:p.get('endcard'), score:p.get('score'), reset:p.get('reset'), intro:p.get('intro'), settings:p.get('settings') };
@@ -128,7 +138,7 @@
   // Silence any third-party AdSense consumers if present
   if (!window.adsbygoogle) { window.adsbygoogle = []; }
 
-  // Live score hook
+  // Live score hook (kept for future use; no tile-based scoring calls now)
   window.WordscendApp_addScore = function(delta){
     try{
       const d = Number(delta||0); if (!isFinite(d) || d===0) return;
@@ -139,15 +149,26 @@
   };
 
   (async () => {
-    // Load engine → UI → dictionary (order matters)
-    await loadAny([`${BASE}/core/engine.js?v=cb2`, `/core/engine.js?v=cb2`]);
-    await loadAny([`${BASE}/ui/dom-view.js?v=cb2`, `/ui/dom-view.js?v=cb2`]);
-    await loadAny([`${BASE}/core/dictionary.js?v=cb2`, `/core/dictionary.js?v=cb2`]);
+    // Load engine → UI → dictionary (order matters) with resilient URL resolution
+    await loadAny(urlCandidates('/core/engine.js?v=cb3'));
+    await loadAny(urlCandidates('/ui/dom-view.js?v=cb3'));
+    await loadAny(urlCandidates('/core/dictionary.js?v=cb3'));
+
+    // Attempt cached allowed list first (optional perf)
+    try{
+      const cached = localStorage.getItem('ws_allowed_v1');
+      if (cached){
+        const arr = JSON.parse(cached);
+        if (Array.isArray(arr)) window.WordscendDictionary._allowedSet = new Set(arr);
+      }
+    }catch{}
 
     let allowedSet;
     try{
       const out = await window.WordscendDictionary.loadDWYL(ALLOWED_URL, { minLen:4, maxLen:7 });
       allowedSet = out.allowedSet;
+      // Cache for next time
+      try{ localStorage.setItem('ws_allowed_v1', JSON.stringify([...allowedSet])); }catch{}
     }catch{
       const fallback = ['TREE','CAMP','WATER','STONE','LIGHT','BRAVE','FAMILY','MARKET','GARDEN','PLANET'];
       allowedSet = new Set(fallback);
@@ -179,7 +200,8 @@
       window.WordscendEngine.submitRow = function(){
         const res = origSubmit();
 
-        if (res && res.ok){
+        // Only mark played / show toast when a round ends *and is a win*
+        if (res && res.ok && res.done && res.win){
           const stInfo = markPlayedToday(store);
           if (stInfo && stInfo.changed){
             window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
