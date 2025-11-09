@@ -46,7 +46,7 @@
     }
   };
 
-  /* ---------- Tiny sound (green only) ---------- */
+  /* ---------- Tiny sound ---------- */
   const AudioFX = {
     _ctx: null,
     _enabled() { return (localStorage.getItem('ws_sound') !== '0'); },
@@ -74,37 +74,26 @@
       const ctx = this._ensure();
       if (!ctx) return;
       this._resumeIfNeeded();
-
       const o = ctx.createOscillator();
       const g = ctx.createGain();
-      o.type = 'sine';
-      o.frequency.value = 880; // A5
-      g.gain.value = 0.08;
-      o.connect(g); g.connect(ctx.destination);
-
+      o.type = 'sine'; o.frequency.value = 880;
+      g.gain.value = 0.08; o.connect(g); g.connect(ctx.destination);
       const now = ctx.currentTime;
-      o.start(now);
-      g.gain.setValueAtTime(0.10, now);
+      o.start(now); g.gain.setValueAtTime(0.10, now);
       g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
       o.stop(now + 0.2);
     },
     chime() {
-      // softer, friendlier than ding
       if (!this._enabled()) return;
       const ctx = this._ensure();
       if (!ctx) return;
       this._resumeIfNeeded();
-
       const o = ctx.createOscillator();
       const g = ctx.createGain();
-      o.type = 'triangle';
-      o.frequency.value = 660; // E5
-      g.gain.value = 0.06;
-      o.connect(g); g.connect(ctx.destination);
-
+      o.type = 'triangle'; o.frequency.value = 660;
+      g.gain.value = 0.06; o.connect(g); g.connect(ctx.destination);
       const now = ctx.currentTime;
-      o.start(now);
-      g.gain.setValueAtTime(0.07, now);
+      o.start(now); g.gain.setValueAtTime(0.07, now);
       g.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
       o.stop(now + 0.28);
     }
@@ -166,7 +155,7 @@
           </div>
 
           <div class="ws-kb" aria-label="On-screen keyboard"></div>
-        ";
+        `; /* <-- correct closing backtick */
 
         // Cache refs
         this.levelEl = this.root.querySelector('#ws-level');
@@ -224,7 +213,6 @@
       const anchor = this.streakEl;
       if (!anchor) return;
       const openTip = () => {
-        // clean previous
         document.querySelector('.ws-streak-tip')?.remove();
 
         const rect = anchor.getBoundingClientRect();
@@ -240,9 +228,8 @@
         `;
         document.body.appendChild(tip);
 
-        // position under the chip
         const pad = 8;
-        tip.style.left = `${Math.min(Math.max(rect.left, 8), window.innerWidth - tip.offsetWidth - 8)}px`;
+        tip.style.left = `${Math.min(Math.max(rect.left, 8), window.innerWidth - (tip.offsetWidth||240) - 8)}px`;
         tip.style.top  = `${rect.bottom + pad}px`;
 
         requestAnimationFrame(()=> tip.classList.add('show'));
@@ -374,7 +361,6 @@
         if (e.repeat) return;
         if (tag === 'input' || tag === 'textarea' || e.metaKey || e.ctrlKey || e.altKey) return;
 
-        // Escape closes modals
         if (e.key === 'Escape') {
           document.querySelector('.ws-modal')?.remove();
           document.querySelector('.ws-endcard')?.remove();
@@ -431,10 +417,7 @@
           return;
         }
 
-        // Flip animation on the submitted row
         this.flipRevealRow(res.attempt - 1, res.marks);
-
-        // Update keyboard now; grid will re-render after flip
         this.renderKeyboard();
 
         if (res.done) {
@@ -466,11 +449,8 @@
         document.body.appendChild(toast);
 
         requestAnimationFrame(()=> toast.classList.add('show'));
-
-        // sounds
         if (milestone) AudioFX.ding(); else AudioFX.chime();
 
-        // pulse the HUD chip
         this.streakEl?.classList.remove('pulse'); void this.streakEl?.offsetWidth;
         this.streakEl?.classList.add('pulse');
         setTimeout(()=> this.streakEl?.classList.remove('pulse'), 300);
@@ -490,7 +470,7 @@
 
       const tiles = Array.from(rowEl.querySelectorAll('.ws-tile'));
       tiles.forEach((tile, i) => {
-        const delay = i * 80; // stagger
+        const delay = i * 80;
         tile.style.setProperty('--flip-delay', `${delay}ms`);
         tile.classList.add('flip');
 
