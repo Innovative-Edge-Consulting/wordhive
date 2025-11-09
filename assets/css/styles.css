@@ -204,7 +204,8 @@ body{
 /* Submitted colors */
 .ws-tile.state-correct{ background:var(--correct); border-color:var(--correct); color:#000; }
 .ws-tile.state-present{ background:var(--present); border-color:var(--present); color:#000; }
-.ws-tile.state-absent{  background:var(--absent);  border-color:#0000; color:var(--text); }
+/* ✅ Restored thin black border for “absent” tiles */
+.ws-tile.state-absent{  background:var(--absent);  border-color:#000; color:var(--text); }
 
 /* Colorblind patterns when enabled */
 :root[data-cb="1"] .ws-tile.state-correct,
