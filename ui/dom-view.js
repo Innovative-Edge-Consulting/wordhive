@@ -147,7 +147,7 @@
         </div>
 
         <div class="ws-kb" aria-label="On-screen keyboard"></div>
-      `; // ✅ properly closed with a backtick
+      `; // closed with a backtick
 
       // Cache refs
       this.levelEl = this.root.querySelector('#ws-level');
