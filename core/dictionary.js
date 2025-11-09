@@ -3,7 +3,7 @@
   const Dict = {
     _allowedSet: new Set(),
     _answers: {
-      4: [], 5: [], 6: [], 7: [] // optional curated pools (empty by default)
+      4: [], 5: [], 6: [], 7: []
     },
 
     async loadDWYL(url, opts = {}) {
