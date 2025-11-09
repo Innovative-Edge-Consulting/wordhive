@@ -288,11 +288,17 @@
 
     handleInput(key) {
       if (/^[A-Za-z]$/.test(key)) {
-        if (global.WordscendEngine.addLetter(key)) this.renderGrid();
+        if (global.WordscendEngine.addLetter(key)) {
+          this.renderGrid();
+          global.WordscendApp_onStateChange?.({ type: 'letter' });
+        }
         return;
       }
       if (key === 'Backspace') {
-        if (global.WordscendEngine.backspace()) this.renderGrid();
+        if (global.WordscendEngine.backspace()) {
+          this.renderGrid();
+          global.WordscendApp_onStateChange?.({ type: 'backspace' });
+        }
         return;
       }
       if (key === 'Enter') {
@@ -316,6 +322,9 @@
 
         if (res.done) {
           setTimeout(() => this.renderGrid(), 420 + (this.config.cols - 1) * 80);
+        }
+        if (res.ok) {
+          global.WordscendApp_onStateChange?.({ type: 'submit', result: res });
         }
         return;
       }
