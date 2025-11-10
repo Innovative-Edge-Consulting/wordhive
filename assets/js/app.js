@@ -57,16 +57,11 @@
 
   /* ---------------- Config ---------------- */
   const BASE = 'https://innovative-edge-consulting.github.io/web-games';
-
-  // Use DWYL raw list for now (huge, permissive). We’ll filter hard below.
-  // You can swap this to another raw list; the filter keeps results sane.
   const ALLOWED_URL = 'https://raw.githubusercontent.com/dwyl/english-words/master/words.txt';
-
-  const SCORE_TABLE = [100, 70, 50, 35, 25, 18]; // per-level bonus
+  const SCORE_TABLE = [100, 70, 50, 35, 25, 18];
   const LEVEL_LENGTHS = [4, 5, 6, 7];
   const STORE_KEY = 'wordscend_v3';
 
-  /* ---------------- Local Store ---------------- */
   function defaultStore() {
     return {
       day: todayKey(),
@@ -109,6 +104,7 @@
         parsed.score = 0;
         parsed.levelIndex = 0;
         parsed.streak.markedToday = false;
+        // keep progress object; stale days are ignored by the restore gate
       }
       if (parsed.levelLen && parsed.levelIndex == null) {
         const idx = Math.max(0, LEVEL_LENGTHS.indexOf(parsed.levelLen));
@@ -182,73 +178,31 @@
     return store;
   }
 
-  /* ---------------- Wordlist Loader (inline replacement for /core/dictionary.js) ---------------- */
-
-  // Basic filters to avoid junk like "OOOO" and abbrev-y stuff.
-  function isCleanWord(w, minLen, maxLen){
-    if (!/^[A-Z]+$/.test(w)) return false;
-    if (w.length < minLen || w.length > maxLen) return false;
-
-    // At least 2 distinct letters (blocks OOOO, AAAA, etc.)
-    const distinct = new Set(w).size;
-    if (distinct < 2) return false;
-
-    // Require at least one vowel (Y allowed for 4+)
-    if (!/[AEIOU]/.test(w)) {
-      if (w.length >= 4 && !/[Y]/.test(w)) return false;
-    }
-
-    // Reject obvious proper nouns/acronyms-like (all caps already; use heuristic: must not end with S-only plurals of odd forms? keep simple)
-    // Keep as-is to avoid over-pruning. You can add more rules if needed.
-
-    return true;
-  }
-
-  async function loadAllowedFromURL(url, { minLen=4, maxLen=7 } = {}) {
-    const res = await fetch(url, { cache:'no-store' });
-    if (!res.ok) throw new Error('Failed to fetch word list');
-    const text = await res.text();
-
-    // Split on newlines, upper-case, filter lengths, then apply clean filters
-    const raw = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    const up = raw.map(s => s.toUpperCase());
-
-    // Build per-length arrays + a single allowed set
-    const perLen = new Map();
-    const allowed = new Set();
-    for (const w of up){
-      if (!isCleanWord(w, minLen, maxLen)) continue;
-      allowed.add(w);
-      const arr = perLen.get(w.length) || [];
-      arr.push(w);
-      perLen.set(w.length, arr);
-    }
-
-    // Light debias: remove ultra-rare junk by requiring at least 2 vowels for long words? (optional)
-    // Keeping conservative for now.
-
-    return {
-      allowedSet: allowed,
-      answersOfLength: (len) => (perLen.get(len) || []).slice()
-    };
-  }
-
-  // Deterministic picker by day (no external seed lib needed)
-  function pickToday(list, dayStr){
-    if (!list || list.length === 0) return null;
-    const s = (dayStr || todayKey()).replace(/-/g,'');
-    // simple hash
-    let h = 2166136261 >>> 0; // FNV-1a seed
-    for (let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
-    const idx = h % list.length;
-    return list[idx];
-  }
-
   /* ---------------- Bootstrap ---------------- */
   const root = document.getElementById('game') || document.body;
   root.innerHTML = '<div style="margin:24px 0;font:600 14px system-ui;color:var(--text);opacity:.85;">Loading word list…</div>';
 
   const store = applyUrlOverrides(loadStore());
+
+  // Public app surface for UI queries (safe getters)
+  window.WordscendApp = window.WordscendApp || {};
+  window.WordscendApp.getStreakInfo = function(){
+    try {
+      const s = store.streak || {};
+      return {
+        current: Number(s.current || 0),
+        best: Number(s.best || 0),
+        available: Number(s.available || 0)
+      };
+    } catch { return { current:0, best:0, available:0 }; }
+  };
+  window.WordscendApp.getLastStreakFlags = function(){
+    try {
+      const f = window.WordscendApp._lastStreakFlags;
+      if (f && f.day === todayKey()) return f;
+      return null;
+    } catch { return null; }
+  };
 
   // Global live-score hook used by UI chips
   window.WordscendApp_addScore = function(delta){
@@ -275,22 +229,16 @@
   };
 
   (async () => {
-    // load order matters: engine, then UI
+    // load order matters
     await loadAny([`${BASE}/core/engine.js?v=state1`, `/core/engine.js?v=state1`]);
     await loadAny([`${BASE}/ui/dom-view.js?v=state1`, `/ui/dom-view.js?v=state1`]);
+    await loadAny([`${BASE}/core/dictionary.js?v=state1`, `/core/dictionary.js?v=state1`]);
 
-    // Load & filter allowed words
-    let allowedSet, answersOfLength;
-    try {
-      const pack = await loadAllowedFromURL(ALLOWED_URL, { minLen: 4, maxLen: 7 });
-      allowedSet = pack.allowedSet;
-      answersOfLength = pack.answersOfLength;
-    } catch (e) {
-      console.warn('[Wordscend] wordlist failed, using fallback', e);
+    const { allowedSet } = await window.WordscendDictionary.loadDWYL(ALLOWED_URL, { minLen: 4, maxLen: 7 }).catch(()=>{
       const fallback = ['TREE','CAMP','WATER','STONE','LIGHT','BRAVE','FAMILY','MARKET','GARDEN','PLANET'];
-      allowedSet = new Set(fallback);
-      answersOfLength = (len)=> fallback.filter(w=>w.length===len);
-    }
+      window.WordscendDictionary._allowedSet = new Set(fallback);
+      return { allowedSet: window.WordscendDictionary._allowedSet };
+    });
 
     const qp = getParams();
 
@@ -316,24 +264,19 @@
       }
     }
 
-    function chooseAnswer(len){
-      // Prefer curated (which is just filtered-per-length here)
-      const list = answersOfLength(len);
-      // Extra safety: avoid “two distinct letters only if one repeats all positions” (already covered), also avoid rare vowel-less words
-      const curated = list.filter(w => /[AEIOU]/.test(w) || /[Y]/.test(w));
-      const pool = curated.length ? curated : list;
-      return pickToday(pool, store.day) || pool[0] || 'APPLE'.slice(0, len);
-    }
-
     async function startLevel(idx){
       const levelLen = LEVEL_LENGTHS[idx];
 
+      const curated = window.WordscendDictionary.answersOfLength(levelLen);
+      const list = curated && curated.length
+        ? curated
+        : Array.from(allowedSet).filter(w => w.length === levelLen);
+
+      const answer = window.WordscendDictionary.pickToday(list);
+
       // Initialize engine
-      window.WordscendEngine.setAllowed(allowedSet);
-
-      const answer = chooseAnswer(levelLen);
+      window.WordscendEngine.setAllowed(window.WordscendDictionary.allowedSet);
       window.WordscendEngine.setAnswer(answer);
-
       const cfg = window.WordscendEngine.init({ rows:6, cols: levelLen });
 
       // ---- Restore progress if same day & same level length ----
@@ -358,10 +301,21 @@
         // Count "played" on any valid processed row
         if (res && res.ok) {
           const stInfo = markPlayedToday(store);
+
           if (stInfo && stInfo.changed){
+            // remember flags for today's tip
+            window.WordscendApp._lastStreakFlags = {
+              usedFreeze: !!stInfo.usedFreeze,
+              earnedFreeze: !!stInfo.earnedFreeze,
+              milestone: stInfo.milestone || null,
+              newBest: !!stInfo.newBest,
+              day: todayKey()
+            };
+
             window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
-            if (stInfo.showToast && window.WordscendUI.showStreakToast){
-              window.WordscendUI.showStreakToast?.(store.streak.current, {
+
+            if (stInfo.showToast){
+              window.WordscendUI.showStreakToast(store.streak.current, {
                 usedFreeze: stInfo.usedFreeze,
                 earnedFreeze: stInfo.earnedFreeze,
                 milestone: stInfo.milestone,
@@ -385,7 +339,7 @@
             saveStore(store);
 
             window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
-            window.WordscendUI.showBubble?.(`+${gained} pts`);
+            window.WordscendUI.showBubble(`+${gained} pts`);
 
             const isLast = (idx === LEVEL_LENGTHS.length - 1);
             setTimeout(() => {
@@ -408,7 +362,7 @@
 
           } else {
             // Fail: retry same level — clear progress so new grid starts clean
-            window.WordscendUI.showBubble?.('Out of tries. Try again');
+            window.WordscendUI.showBubble('Out of tries. Try again');
             clearProgressForLen(levelLen);
             saveStore(store);
             setTimeout(() => startLevel(idx), 1200);
