@@ -92,16 +92,15 @@
   };
   AudioFX.armAutoResumeOnce();
 
-  /* ---------- UI ---------- */
   const UI = {
     mount(rootEl, config) {
       if (!rootEl) return;
+      // Idempotent re-mount: wipe only our region
       this.root = rootEl;
       this.config = config || { rows:6, cols:5 };
 
       Theme.apply(Theme.getPref());
 
-      // Page bg overlay (once)
       if (!document.querySelector('.ws-page-bg')){
         const bg = document.createElement('div'); bg.className='ws-page-bg'; document.body.appendChild(bg);
       }
@@ -152,27 +151,13 @@
       this.kbEl    = this.root.querySelector('.ws-kb');
       this.bubble  = this.root.querySelector('#ws-bubble');
 
-      // Initial render
       this.renderGrid();
       this.renderKeyboard();
 
-      // Header actions
       this.bindHeader();
-
-      // Input bindings
       this.bindKeyboard();       // once per page
       this._kbClickBound = false;
       this.bindKbClicks();       // per mount
-
-      // Streak tip bindings (hover/click)
-      if (!this._streakTipBound) {
-        this._streakTipBound = true;
-        this.streakEl?.addEventListener('mouseenter', () => this._openStreakTip(), { passive:true });
-        this.streakEl?.addEventListener('mouseleave', () => this.hideStreakTip(), { passive:true });
-        this.streakEl?.addEventListener('click', () => this._openStreakTip(), { passive:true });
-      }
-
-      console.log('[Wordscend] UI mounted:', this.config.rows, 'rows ×', this.config.cols);
     },
 
     setHUD(levelText, score, streak){
@@ -210,7 +195,7 @@
           const ch = row[c] || '';
           tile.textContent = ch;
 
-          const mark = (marks[r] && marks[r][c]) || null;
+          const mark = marks[r]?.[c];
           if (mark) tile.classList.add('state-' + mark);
 
           if (ch) tile.classList.add('filled');
@@ -414,7 +399,7 @@
           const midX = (tRect.left + sRect.left)/2;
           const midY = Math.min(tRect.top, sRect.top) - 40;
 
-          chip.style.transitionTimingFunction = 'cubic-bezier(.22,.82,.25,1)';
+        chip.style.transitionTimingFunction = 'cubic-bezier(.22,.82,.25,1)';
           chip.style.left = `${midX}px`;
           chip.style.top  = `${midY}px`;
           chip.style.transform = 'translate(-50%, -50%) scale(1.05)';
@@ -439,89 +424,141 @@
       }catch{}
     },
 
-    /* ---------- Streak Toast & Tip ---------- */
-    showStreakToast(streak, opts = {}) {
-      let toast = document.querySelector('.ws-streak-toast');
-      if (!toast) {
-        toast = document.createElement('div');
-        toast.className = 'ws-streak-toast';
-        document.body.appendChild(toast);
-      }
+    showEndCard(score, streakCurrent = 0, streakBest = 0) {
+      document.querySelector('.ws-endcard')?.remove();
 
-      const parts = [`🔥 Streak ${streak}`];
-      if (opts.usedFreeze)   parts.push('• Freeze used');
-      if (opts.earnedFreeze) parts.push('• +1 Freeze earned');
-      if (opts.milestone)    parts.push(`• Milestone ${opts.milestone}!`);
-      if (opts.newBest)      parts.push('• New best!');
+      const wrap = document.createElement('div');
+      wrap.className = 'ws-endcard';
+      wrap.innerHTML = `
+        <div class="card">
+          <h3>Daily Wordscend Complete 🎉</h3>
+          <p>Your total score: <strong>${score}</strong></p>
+          <p>Streak: <strong>${streakCurrent}</strong> day(s) • Best: <strong>${streakBest}</strong></p>
+          <div class="row">
+            <button class="ws-btn primary" data-action="share">Share Score</button>
+            <button class="ws-btn" data-action="copy">Copy Score</button>
+            <button class="ws-btn" data-action="close">Close</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(wrap);
 
-      toast.innerHTML = `${parts.join(' ')}${
-        typeof opts.freezesAvail === 'number'
-          ? `<span class="sub">Freezes available: ${opts.freezesAvail}</span>`
-          : ''
-      }`;
-
-      // gentle chime respecting Settings
-      try { AudioFX.chime(); } catch {}
-
-      requestAnimationFrame(() => { toast.classList.add('show'); });
-      clearTimeout(this._streakToastTimer);
-      this._streakToastTimer = setTimeout(() => {
-        toast.classList.remove('show');
-      }, 2200);
-    },
-
-    _showStreakTipEl: null,
-    _openStreakTip(){
-      const info = (global.WordscendApp && global.WordscendApp.getStreakInfo)
-        ? global.WordscendApp.getStreakInfo() : { current:0, best:0, available:0 };
-      const flags = (global.WordscendApp && global.WordscendApp.getLastStreakFlags)
-        ? (global.WordscendApp.getLastStreakFlags() || {}) : {};
-
-      const lines = [
-        `Current: ${info.current} • Best: ${info.best}`,
-        `Freezes available: ${info.available}`,
-      ];
-      const todayNotes = [];
-      if (flags.usedFreeze)   todayNotes.push('Freeze used today');
-      if (flags.earnedFreeze) todayNotes.push('Earned +1 freeze today');
-      if (flags.milestone)    todayNotes.push(`Milestone ${flags.milestone}!`);
-      if (flags.newBest)      todayNotes.push('New best today');
-
-      if (todayNotes.length) lines.push(todayNotes.join(' • '));
-      lines.push('Tip: Earn one freeze each month by reaching a 7-day streak. A freeze covers a 1-day gap automatically.');
-
-      this.showStreakTip(lines.join('\n'));
-    },
-    showStreakTip(text) {
-      if (!this.streakEl) return;
-      if (!this._showStreakTipEl) {
-        const tip = document.createElement('div');
-        tip.className = 'ws-streak-tip';
-        const safe = (text || '').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br/>');
-        tip.innerHTML = `<div>${safe}</div><div class="row"><button class="ws-btn" data-close="1">OK</button></div>`;
-        document.body.appendChild(tip);
-        this._showStreakTipEl = tip;
-
-        tip.addEventListener('click', (e) => {
-          if (e.target.closest('[data-close]')) tip.classList.remove('show');
-        }, { passive: true });
-      } else {
-        const firstDiv = this._showStreakTipEl.querySelector('div');
-        if (firstDiv) {
-          firstDiv.innerHTML = (text || '').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br/>');
+      const shareText = `I just finished today's Wordscend (4→7 letters) with ${score} points! Streak: ${streakCurrent} (best ${streakBest}).`;
+      wrap.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const act = btn.dataset.action;
+        if (act === 'close') wrap.remove();
+        if (act === 'copy') {
+          try { await navigator.clipboard.writeText(shareText); btn.textContent = 'Copied!'; }
+          catch { btn.textContent = 'Copy failed'; }
         }
-      }
+        if (act === 'share') {
+          if (navigator.share) {
+            try { await navigator.share({ text: shareText }); } catch{}
+          } else {
+            try { await navigator.clipboard.writeText(shareText); btn.textContent = 'Copied!'; }
+            catch { btn.textContent = 'Share not supported'; }
+          }
+        }
+      }, { passive:true });
 
-      const r = this.streakEl.getBoundingClientRect();
-      const tip = this._showStreakTipEl;
-      tip.style.position = 'fixed';
-      tip.style.left = `${Math.min(window.innerWidth - 16, Math.max(16, r.left))}px`;
-      tip.style.top  = `${r.bottom + 8}px`;
-      requestAnimationFrame(() => tip.classList.add('show'));
+      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
     },
-    hideStreakTip() {
-      this._showStreakTipEl?.classList.remove('show');
-    }
+
+    showRulesModal() {
+      document.querySelector('.ws-modal')?.remove();
+      const wrap = document.createElement('div');
+      wrap.className = 'ws-modal';
+      wrap.innerHTML = `
+        <div class="card" role="dialog" aria-label="How to play Wordscend">
+          <h3>How to Play 🧩</h3>
+          <p>Climb through <strong>4 levels</strong> of daily word puzzles — from 4-letter to 7-letter words. You have <strong>6 tries</strong> per level.</p>
+          <ul style="margin:6px 0 0 18px; color:var(--muted); line-height:1.5;">
+            <li>Type or tap to guess a word of the current length.</li>
+            <li>Tiles turn <strong>green</strong> (correct spot) or <strong>yellow</strong> (in word, wrong spot).</li>
+            <li>Beat a level to advance to the next length.</li>
+            <li>Keep your <strong>🔥 streak</strong> by playing each day.</li>
+          </ul>
+          <div class="ws-mini-row" aria-hidden="true">
+            <div class="ws-mini-tile correct">C</div>
+            <div class="ws-mini-tile present">A</div>
+            <div class="ws-mini-tile absent">T</div>
+            <div class="ws-mini-tile absent">S</div>
+            <div class="ws-mini-tile present">Y</div>
+          </div>
+          <div class="row">
+            <button class="ws-btn primary" data-action="close">Got it</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(wrap);
+      wrap.addEventListener('click', (e)=>{
+        if (e.target.dataset.action === 'close' || e.target === wrap) wrap.remove();
+      }, { passive:true });
+      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
+    },
+
+    showSettingsModal() {
+      document.querySelector('.ws-modal')?.remove();
+      const wrap = document.createElement('div');
+      wrap.className = 'ws-modal';
+
+      const sound = localStorage.getItem('ws_sound') !== '0';
+      const colorblind = localStorage.getItem('ws_colorblind') === '1';
+      const themePref = (localStorage.getItem('ws_theme') || 'dark');
+
+      wrap.innerHTML = `
+        <div class="card" role="dialog" aria-label="Settings">
+          <h3>Settings ⚙️</h3>
+          <div class="ws-form">
+            <div class="ws-field">
+              <label for="ws-theme">Theme</label>
+              <select id="ws-theme">
+                <option value="dark"  ${themePref==='dark'?'selected':''}>Dark</option>
+                <option value="light" ${themePref==='light'?'selected':''}>Light</option>
+                <option value="auto"  ${themePref==='auto'?'selected':''}>Auto (system)</option>
+              </select>
+            </div>
+            <div class="ws-field">
+              <label for="ws-sound">Sound effects</label>
+              <input id="ws-sound" type="checkbox" ${sound?'checked':''}/>
+            </div>
+            <div class="ws-field">
+              <label for="ws-cb">Colorblind hints</label>
+              <input id="ws-cb" type="checkbox" ${colorblind?'checked':''}/>
+            </div>
+          </div>
+          <div class="row">
+            <button class="ws-btn primary" data-action="save">Save</button>
+            <button class="ws-btn" data-action="close">Close</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(wrap);
+
+      wrap.addEventListener('click', (e)=>{
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) { if (e.target === wrap) wrap.remove(); return; }
+        const act = btn.dataset.action;
+        if (act === 'save'){
+          const theme = wrap.querySelector('#ws-theme').value;
+          const s = wrap.querySelector('#ws-sound').checked;
+          const cb= wrap.querySelector('#ws-cb').checked;
+          try {
+            Theme.setPref(theme);
+            Theme.apply(theme);
+            localStorage.setItem('ws_sound', s ? '1':'0');
+            localStorage.setItem('ws_colorblind', cb ? '1':'0');
+          } catch {}
+          btn.textContent='Saved';
+          setTimeout(()=>wrap.remove(), 420);
+        }
+        if (act === 'close') wrap.remove();
+      }, { passive:true });
+
+      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
+    },
   };
 
   global.WordscendUI = UI;
