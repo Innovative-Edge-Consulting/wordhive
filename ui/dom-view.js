@@ -92,14 +92,7 @@
   };
   AudioFX.armAutoResumeOnce();
 
-  /* ---------- Helpers ---------- */
-  function getFreezesAvail() {
-    try {
-      // Optional; safe if app.js didn't expose it
-      return (global?.WordscendApp?.getFreezes?.() ?? null);
-    } catch { return null; }
-  }
-
+  /* ---------- UI ---------- */
   const UI = {
     mount(rootEl, config) {
       if (!rootEl) return;
@@ -163,8 +156,10 @@
       this.renderGrid();
       this.renderKeyboard();
 
-      // Header & input bindings
+      // Header actions
       this.bindHeader();
+
+      // Input bindings
       this.bindKeyboard();       // once per page
       this._kbClickBound = false;
       this.bindKbClicks();       // per mount
@@ -172,21 +167,9 @@
       // Streak tip bindings (hover/click)
       if (!this._streakTipBound) {
         this._streakTipBound = true;
-        this.streakEl?.addEventListener('mouseenter', () => {
-          const avail = getFreezesAvail();
-          const msg = (typeof avail === 'number')
-            ? `Freezes available: ${avail}`
-            : `Keep your streak by playing daily.`;
-          this.showStreakTip(msg);
-        }, { passive:true });
+        this.streakEl?.addEventListener('mouseenter', () => this._openStreakTip(), { passive:true });
         this.streakEl?.addEventListener('mouseleave', () => this.hideStreakTip(), { passive:true });
-        this.streakEl?.addEventListener('click', () => {
-          const avail = getFreezesAvail();
-          const msg = (typeof avail === 'number')
-            ? `Freezes available: ${avail}`
-            : `Keep your streak by playing daily.`;
-          this.showStreakTip(msg);
-        }, { passive:true });
+        this.streakEl?.addEventListener('click', () => this._openStreakTip(), { passive:true });
       }
 
       console.log('[Wordscend] UI mounted:', this.config.rows, 'rows ×', this.config.cols);
@@ -293,7 +276,6 @@
         const tag = (e.target && e.target.tagName || '').toLowerCase();
         if (tag === 'input' || tag === 'textarea' || e.metaKey || e.ctrlKey || e.altKey) return;
 
-        // Escape closes modals
         if (e.key === 'Escape') {
           document.querySelector('.ws-modal')?.remove();
           document.querySelector('.ws-endcard')?.remove();
@@ -349,7 +331,6 @@
           return;
         }
 
-        // Flip animation on the submitted row; update keyboard immediately
         this.flipRevealRow(res.attempt - 1, res.marks);
         this.renderKeyboard();
 
@@ -371,7 +352,7 @@
 
       const tiles = Array.from(rowEl.querySelectorAll('.ws-tile'));
       tiles.forEach((tile, i) => {
-        const delay = i * 80; // stagger
+        const delay = i * 80;
         tile.style.setProperty('--flip-delay', `${delay}ms`);
         tile.classList.add('flip');
 
@@ -381,7 +362,6 @@
             tile.classList.remove('state-correct','state-present','state-absent');
             tile.classList.add('state-' + mark);
 
-            // Visual points & sound; live-score increment after chip lands
             if (mark === 'correct') {
               this.floatPointsFromTile(tile, +2, 'green');
               AudioFX.ding();
@@ -480,6 +460,9 @@
           : ''
       }`;
 
+      // gentle chime respecting Settings
+      try { AudioFX.chime(); } catch {}
+
       requestAnimationFrame(() => { toast.classList.add('show'); });
       clearTimeout(this._streakToastTimer);
       this._streakToastTimer = setTimeout(() => {
@@ -488,12 +471,34 @@
     },
 
     _showStreakTipEl: null,
+    _openStreakTip(){
+      const info = (global.WordscendApp && global.WordscendApp.getStreakInfo)
+        ? global.WordscendApp.getStreakInfo() : { current:0, best:0, available:0 };
+      const flags = (global.WordscendApp && global.WordscendApp.getLastStreakFlags)
+        ? (global.WordscendApp.getLastStreakFlags() || {}) : {};
+
+      const lines = [
+        `Current: ${info.current} • Best: ${info.best}`,
+        `Freezes available: ${info.available}`,
+      ];
+      const todayNotes = [];
+      if (flags.usedFreeze)   todayNotes.push('Freeze used today');
+      if (flags.earnedFreeze) todayNotes.push('Earned +1 freeze today');
+      if (flags.milestone)    todayNotes.push(`Milestone ${flags.milestone}!`);
+      if (flags.newBest)      todayNotes.push('New best today');
+
+      if (todayNotes.length) lines.push(todayNotes.join(' • '));
+      lines.push('Tip: Earn one freeze each month by reaching a 7-day streak. A freeze covers a 1-day gap automatically.');
+
+      this.showStreakTip(lines.join('\n'));
+    },
     showStreakTip(text) {
       if (!this.streakEl) return;
       if (!this._showStreakTipEl) {
         const tip = document.createElement('div');
         tip.className = 'ws-streak-tip';
-        tip.innerHTML = `<div>${text}</div><div class="row"><button class="ws-btn" data-close="1">OK</button></div>`;
+        const safe = (text || '').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br/>');
+        tip.innerHTML = `<div>${safe}</div><div class="row"><button class="ws-btn" data-close="1">OK</button></div>`;
         document.body.appendChild(tip);
         this._showStreakTipEl = tip;
 
@@ -501,9 +506,10 @@
           if (e.target.closest('[data-close]')) tip.classList.remove('show');
         }, { passive: true });
       } else {
-        // update text (first div)
         const firstDiv = this._showStreakTipEl.querySelector('div');
-        if (firstDiv) firstDiv.textContent = text;
+        if (firstDiv) {
+          firstDiv.innerHTML = (text || '').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br/>');
+        }
       }
 
       const r = this.streakEl.getBoundingClientRect();
