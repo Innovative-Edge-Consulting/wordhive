@@ -46,7 +46,7 @@
     }
   };
 
-  /* ---------- Tiny sound (green only) ---------- */
+  /* ---------- Tiny sound ---------- */
   const AudioFX = {
     _ctx: null,
     _enabled() { return (localStorage.getItem('ws_sound') !== '0'); },
@@ -71,17 +71,11 @@
     },
     ding() {
       if (!this._enabled()) return;
-      const ctx = this._ensure();
-      if (!ctx) return;
-      this._resumeIfNeeded();
-
+      const ctx = this._ensure(); if (!ctx) return; this._resumeIfNeeded();
       const o = ctx.createOscillator();
       const g = ctx.createGain();
-      o.type = 'sine';
-      o.frequency.value = 880; // A5
-      g.gain.value = 0.08;
+      o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.08;
       o.connect(g); g.connect(ctx.destination);
-
       const now = ctx.currentTime;
       o.start(now);
       g.gain.setValueAtTime(0.10, now);
@@ -100,19 +94,17 @@
 
   const UI = {
     mount(rootEl, config) {
-      if (!rootEl) { console.warn('[Wordscend] No mount element provided.'); return; }
+      if (!rootEl) return;
+      // Idempotent re-mount: wipe only our region
       this.root = rootEl;
-      this.config = config;
+      this.config = config || { rows:6, cols:5 };
 
-      // Ensure theme is applied on mount too (app.js also pre-applies to avoid flash)
       Theme.apply(Theme.getPref());
 
-      // Page bg overlay
       if (!document.querySelector('.ws-page-bg')){
         const bg = document.createElement('div'); bg.className='ws-page-bg'; document.body.appendChild(bg);
       }
 
-      // Topbar (brand + actions) + HUD + Stage + Keyboard
       this.root.innerHTML = `
         <div class="ws-topbar">
           <div class="ws-topbar-inner">
@@ -147,7 +139,7 @@
         </div>
 
         <div class="ws-kb" aria-label="On-screen keyboard"></div>
-      `; // closed with a backtick
+      `;
 
       // Cache refs
       this.levelEl = this.root.querySelector('#ws-level');
@@ -158,21 +150,13 @@
       this.kbEl    = this.root.querySelector('.ws-kb');
       this.bubble  = this.root.querySelector('#ws-bubble');
 
-      // Build grid + keyboard
       this.renderGrid();
       this.renderKeyboard();
 
-      // Bind header actions
       this.bindHeader();
-
-      // Bind physical keyboard ONCE per page
-      this.bindKeyboard();
-
-      // Re-bind on-screen keyboard EACH mount
+      this.bindKeyboard();       // once per page
       this._kbClickBound = false;
-      this.bindKbClicks();
-
-      console.log('[Wordscend] UI mounted:', config.rows, 'rows ×', config.cols);
+      this.bindKbClicks();       // per mount
     },
 
     setHUD(levelText, score, streak){
@@ -185,8 +169,8 @@
     bindHeader(){
       const info = this.root.querySelector('#ws-info');
       const settings = this.root.querySelector('#ws-settings');
-      info.addEventListener('click', ()=> this.showRulesModal());
-      settings.addEventListener('click', ()=> this.showSettingsModal());
+      info?.addEventListener('click', ()=> this.showRulesModal(), { passive:true });
+      settings?.addEventListener('click', ()=> this.showSettingsModal(), { passive:true });
     },
 
     /* ---------- Rendering ---------- */
@@ -274,9 +258,8 @@
 
       window.addEventListener('keydown', (e) => {
         const tag = (e.target && e.target.tagName || '').toLowerCase();
-        if (tag === 'input' || tag === 'textarea' || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (tag === 'input' || 'textarea' === tag || e.metaKey || e.ctrlKey || e.altKey) return;
 
-        // Escape closes modals
         if (e.key === 'Escape') {
           document.querySelector('.ws-modal')?.remove();
           document.querySelector('.ws-endcard')?.remove();
@@ -296,7 +279,7 @@
         const btn = e.target.closest('.ws-kb-key');
         if (!btn) return;
         e.preventDefault();
-        e.stopPropagation();
+               e.stopPropagation();
         this.handleInput(btn.dataset.key);
       }, { passive: false });
     },
@@ -332,10 +315,7 @@
           return;
         }
 
-        // Flip animation on the submitted row
         this.flipRevealRow(res.attempt - 1, res.marks);
-
-        // Update keyboard now; grid will re-render after flip
         this.renderKeyboard();
 
         if (res.done) {
@@ -356,7 +336,7 @@
 
       const tiles = Array.from(rowEl.querySelectorAll('.ws-tile'));
       tiles.forEach((tile, i) => {
-        const delay = i * 80; // stagger
+        const delay = i * 80;
         tile.style.setProperty('--flip-delay', `${delay}ms`);
         tile.classList.add('flip');
 
@@ -366,7 +346,6 @@
             tile.classList.remove('state-correct','state-present','state-absent');
             tile.classList.add('state-' + mark);
 
-            // Visual points & sound, then LIVE score increment on chip landing
             if (mark === 'correct') {
               this.floatPointsFromTile(tile, +2, 'green');
               AudioFX.ding();
@@ -445,8 +424,7 @@
     },
 
     showEndCard(score, streakCurrent = 0, streakBest = 0) {
-      const old = document.querySelector('.ws-endcard');
-      if (old) old.remove();
+      document.querySelector('.ws-endcard')?.remove();
 
       const wrap = document.createElement('div');
       wrap.className = 'ws-endcard';
@@ -487,7 +465,6 @@
       window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
     },
 
-    /* ---------- Modals ---------- */
     showRulesModal() {
       document.querySelector('.ws-modal')?.remove();
       const wrap = document.createElement('div');
