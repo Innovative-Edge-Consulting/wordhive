@@ -95,6 +95,7 @@
   const UI = {
     mount(rootEl, config) {
       if (!rootEl) return;
+      // Idempotent re-mount: wipe only our region
       this.root = rootEl;
       this.config = config || { rows:6, cols:5 };
 
@@ -193,7 +194,7 @@
           const ch = row[c] || '';
           tile.textContent = ch;
 
-          const mark = (marks[r] && marks[r][c]) || null;
+          const mark = marks[r]?.[c];
           if (mark) tile.classList.add('state-' + mark);
 
           if (ch) tile.classList.add('filled');
@@ -400,7 +401,8 @@
           chip.style.transitionTimingFunction = 'cubic-bezier(.22,.82,.25,1)';
           chip.style.left = `${midX}px`;
           chip.style.top  = `${midY}px`;
-          chip.style.transform = 'translate(-50%, -50%) scale(1.05)`;
+          // FIXED: closing quote/backtick — this must end with a single quote, not a backtick.
+          chip.style.transform = 'translate(-50%, -50%) scale(1.05)';
 
           setTimeout(()=>{
             chip.style.left = `${sRect.left + sRect.width/2}px`;
@@ -470,7 +472,7 @@
       const wrap = document.createElement('div');
       wrap.className = 'ws-modal';
 
-      // Build a real single game row as the example (no awkward spacing)
+      // Real single game row example (tight like the board)
       const exampleRowHTML = `
         <div class="ws-row" style="display:grid;grid-template-columns:repeat(5,var(--tileSize));gap:8px;margin-top:8px;">
           <div class="ws-tile filled state-correct">C</div>
