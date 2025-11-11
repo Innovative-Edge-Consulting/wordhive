@@ -475,11 +475,11 @@
       // Real single game row example (tight like the board)
       const exampleRowHTML = `
         <div class="ws-row" style="display:grid;grid-template-columns:repeat(5,var(--tileSize));gap:8px;margin-top:8px;">
-          <div class="ws-tile filled state-correct">C</div>
-          <div class="ws-tile filled state-present">A</div>
-          <div class="ws-tile filled state-absent">T</div>
-          <div class="ws-tile filled state-absent">S</div>
-          <div class="ws-tile filled state-present">Y</div>
+          <div class="ws-tile filled state-correct">P</div>
+          <div class="ws-tile filled state-present">L</div>
+          <div class="ws-tile filled state-absent">A</div>
+          <div class="ws-tile filled state-absent">N</div>
+          <div class="ws-tile filled state-present">T</div>
         </div>
       `;
 
