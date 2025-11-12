@@ -6,6 +6,15 @@
     ['Enter','Z','X','C','V','B','N','M','Back']
   ];
 
+  /* ---------- small date helpers ---------- */
+  function todayKey() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${da}`;
+  }
+
   /* ---------- Theme helpers ---------- */
   const Theme = {
     media: null,
@@ -93,10 +102,24 @@
   AudioFX.armAutoResumeOnce();
 
   const UI = {
+    /* external hooks */
+    _hintCb: null,
+    onHintRequest(cb){
+      this._hintCb = (typeof cb === 'function') ? cb : null;
+    },
+    setAnswerMeta(answer, meta){
+      this.answerWord = (answer || '').toUpperCase();
+      this.answerMeta = meta && typeof meta === 'object' ? meta : null;
+      this._syncHintButtonState();
+    },
+
     mount(rootEl, config) {
       if (!rootEl) return;
+      // Idempotent re-mount: wipe only our region
       this.root = rootEl;
       this.config = config || { rows:6, cols:5 };
+      this.answerWord = null;
+      this.answerMeta = null;
 
       Theme.apply(Theme.getPref());
 
@@ -111,16 +134,25 @@
               <span class="dot"></span> Wordscend
             </div>
             <div class="ws-actions">
+              <!-- Info -->
               <button class="icon-btn" id="ws-info" type="button" title="How to play" aria-label="How to play">
                 <svg viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
-                  <path d="M12 8.5h.01M11 11.5h1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"></circle>
+                  <path d="M12 8.5h.01M11 11.5h1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
                 </svg>
               </button>
+
+              <!-- Hint (light bulb) -->
+              <button class="icon-btn" id="ws-hint" type="button" title="Hint (–10 pts)" aria-label="Hint">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M9 18h6m-7 2h8M8 10a4 4 0 1 1 8 0c0 1.6-.8 2.6-1.7 3.6-.5.5-.8 1.1-.8 1.7v.2H10.5v-.2c0-.6-.3-1.2-.8-1.7C8.8 12.6 8 11.6 8 10Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </button>
+
+              <!-- Settings (gear) -->
               <button class="icon-btn" id="ws-settings" type="button" title="Settings" aria-label="Settings">
                 <svg viewBox="-1 -1 26 26" fill="none" aria-hidden="true">
-                  <path d="M19.4 13.1a7.9 7.9 0 0 0 0-2.2l2-1.5-1.6-2.7-2.4.9a8 8 0 0 0-1.9-1.1l-.3-2.5h-3.2l-.3 2.5c-.7.2-1.3.6-1.9 1.1l-2.4-.9-1.6 2.7 2 1.5a7.9 7.9 0 0 0 0 2.2l-2 1.5 1.6 2.7 2.4-.9c.6.5 1.2.8 1.9 1.1l2.4.9 1.6-2.7-2-1.5Z"
-                        stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M19.4 13.1a7.9 7.9 0 0 0 0-2.2l2-1.5-1.6-2.7-2.4.9a8 8 0 0 0-1.9-1.1l-.3-2.5h-3.2l-.3 2.5c-.7.2-1.3.6-1.9 1.1l-2.4-.9-1.6 2.7 2 1.5a7.9 7.9 0 0 0 0 2.2l-2 1.5 1.6 2.7 2.4-.9c.6.5 1.2.8 1.9 1.1l2.4.9 1.6-2.7-2-1.5Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
                   <circle cx="12" cy="12" r="3.5" stroke="currentColor" stroke-width="1.5"></circle>
                 </svg>
               </button>
@@ -152,14 +184,16 @@
       this.gridEl  = this.root.querySelector('.ws-grid');
       this.kbEl    = this.root.querySelector('.ws-kb');
       this.bubble  = this.root.querySelector('#ws-bubble');
+      this.hintBtn = this.root.querySelector('#ws-hint');
 
+      this._restoreHintDisabled();
       this.renderGrid();
       this.renderKeyboard();
 
       this.bindHeader();
-      this.bindKeyboard();
+      this.bindKeyboard();       // once per page
       this._kbClickBound = false;
-      this.bindKbClicks();
+      this.bindKbClicks();       // per mount
     },
 
     setHUD(levelText, score, streak){
@@ -174,11 +208,19 @@
       const settings = this.root.querySelector('#ws-settings');
       info?.addEventListener('click', ()=> this.showRulesModal(), { passive:true });
       settings?.addEventListener('click', ()=> this.showSettingsModal(), { passive:true });
+
+      // Hint handler (safe: one-time per day/level)
+      this.hintBtn?.addEventListener('click', () => {
+        if (!this._hintAvailable()) return;
+        const hint = this.answerMeta && this.answerMeta.hint ? String(this.answerMeta.hint) : 'No hint available';
+        this.showStreakToast(null, { hintText: hint });
+        this._markHintUsed();
+        try { this._hintCb && this._hintCb(); } catch {}
+      }, { passive:true });
     },
 
     /* ---------- Rendering ---------- */
     renderGrid() {
-      if (!global.WordscendEngine) return;
       const board  = global.WordscendEngine.getBoard();
       const marks  = global.WordscendEngine.getRowMarks();
       const cursor = global.WordscendEngine.getCursor();
@@ -216,7 +258,7 @@
     },
 
     renderKeyboard() {
-      const status = global.WordscendEngine?.getKeyStatus?.() || {};
+      const status = global.WordscendEngine.getKeyStatus();
       this.kbEl.innerHTML = '';
 
       const isMobile = (window.matchMedia && window.matchMedia('(max-width: 430px)').matches);
@@ -381,6 +423,31 @@
       this._bT = setTimeout(() => this.bubble.classList.remove('show'), 1400);
     },
 
+    /* Compact toast (also used for hint display) */
+    showStreakToast(currentCount, opts = {}) {
+      const { usedFreeze, earnedFreeze, milestone, newBest, freezesAvail, hintText } = opts;
+      const old = document.querySelector('.ws-streak-toast');
+      old?.remove();
+
+      const el = document.createElement('div');
+      el.className = 'ws-streak-toast';
+      if (hintText) {
+        el.innerHTML = '<strong>Hint</strong><span class="sub">'+escapeHtml(hintText)+'</span>';
+      } else {
+        const parts = [];
+        if (typeof currentCount === 'number') parts.push('🔥 Streak '+currentCount);
+        if (usedFreeze) parts.push('Freeze used ✅');
+        if (earnedFreeze) parts.push('Freeze earned 🎁');
+        if (typeof freezesAvail === 'number') parts.push('Freezes: '+freezesAvail);
+        if (milestone) parts.push('Milestone '+milestone+' 🎉');
+        if (newBest) parts.push('New best! 🏆');
+        el.innerHTML = '<strong>'+(parts.shift()||'Nice!')+'</strong>'+(parts.length?'<span class="sub">'+parts.join(' • ')+'</span>':'');
+      }
+      document.body.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      setTimeout(() => { el.classList.remove('show'); setTimeout(()=>el.remove(), 200); }, 2200);
+    },
+
     /* Floating points chip */
     floatPointsFromTile(tileEl, delta, color='green'){
       try{
@@ -391,10 +458,10 @@
         const sRect = scoreEl.getBoundingClientRect();
 
         const chip = document.createElement('div');
-        chip.className = `ws-fxfloat ${color==='green'?'green':'yellow'}`;
-        chip.textContent = (delta > 0 ? `+${delta}` : `${delta}`);
-        chip.style.left = `${tRect.left + tRect.width/2}px`;
-        chip.style.top  = `${tRect.top  + tRect.height/2}px`;
+        chip.className = 'ws-fxfloat '+(color==='green'?'green':'yellow');
+        chip.textContent = (delta > 0 ? '+'+delta : String(delta));
+        chip.style.left = (tRect.left + tRect.width/2) + 'px';
+        chip.style.top  = (tRect.top  + tRect.height/2) + 'px';
         chip.style.transform = 'translate(-50%, -50%) scale(1)';
         document.body.appendChild(chip);
 
@@ -403,13 +470,13 @@
           const midY = Math.min(tRect.top, sRect.top) - 40;
 
           chip.style.transitionTimingFunction = 'cubic-bezier(.22,.82,.25,1)';
-          chip.style.left = `${midX}px`;
-          chip.style.top  = `${midY}px`;
+          chip.style.left = midX + 'px';
+          chip.style.top  = midY + 'px';
           chip.style.transform = 'translate(-50%, -50%) scale(1.05)';
 
           setTimeout(()=>{
-            chip.style.left = `${sRect.left + sRect.width/2}px`;
-            chip.style.top  = `${sRect.top  + sRect.height/2}px`;
+            chip.style.left = (sRect.left + sRect.width/2) + 'px';
+            chip.style.top  = (sRect.top  + sRect.height/2) + 'px';
             chip.style.transform = 'translate(-50%, -50%) scale(0.8)';
             chip.style.opacity = '0.0';
           }, 160);
@@ -432,21 +499,20 @@
 
       const wrap = document.createElement('div');
       wrap.className = 'ws-endcard';
-      wrap.innerHTML = `
-        <div class="card">
-          <h3>Daily Wordscend Complete 🎉</h3>
-          <p>Your total score: <strong>${score}</strong></p>
-          <p>Streak: <strong>${streakCurrent}</strong> day(s) • Best: <strong>${streakBest}</strong></p>
-          <div class="row">
-            <button class="ws-btn primary" data-action="share">Share Score</button>
-            <button class="ws-btn" data-action="copy">Copy Score</button>
-            <button class="ws-btn" data-action="close">Close</button>
-          </div>
-        </div>
-      `;
+      wrap.innerHTML =
+        '<div class="card">' +
+          '<h3>Daily Wordscend Complete 🎉</h3>' +
+          '<p>Your total score: <strong>'+score+'</strong></p>' +
+          '<p>Streak: <strong>'+streakCurrent+'</strong> day(s) • Best: <strong>'+streakBest+'</strong></p>' +
+          '<div class="row">' +
+            '<button class="ws-btn primary" data-action="share">Share Score</button>' +
+            '<button class="ws-btn" data-action="copy">Copy Score</button>' +
+            '<button class="ws-btn" data-action="close">Close</button>' +
+          '</div>' +
+        '</div>';
       document.body.appendChild(wrap);
 
-      const shareText = `I just finished today's Wordscend (4→7 letters) with ${score} points! Streak: ${streakCurrent} (best ${streakBest}).`;
+      const shareText = "I just finished today's Wordscend (4→7 letters) with "+score+" points! Streak: "+streakCurrent+" (best "+streakBest+").";
       wrap.addEventListener('click', async (e) => {
         const btn = e.target.closest('button[data-action]');
         if (!btn) return;
@@ -476,32 +542,30 @@
       wrap.className = 'ws-modal';
 
       // Real single game row example (tight like the board)
-      const exampleRowHTML = `
-        <div class="ws-row" style="display:grid;grid-template-columns:repeat(5,var(--tileSize));gap:8px;margin-top:8px;">
-          <div class="ws-tile filled state-correct">P</div>
-          <div class="ws-tile filled state-present">L</div>
-          <div class="ws-tile filled state-absent">A</div>
-          <div class="ws-tile filled state-absent">N</div>
-          <div class="ws-tile filled state-present">T</div>
-        </div>
-      `;
+      const exampleRowHTML =
+        '<div class="ws-row" style="display:grid;grid-template-columns:repeat(5,var(--tileSize));gap:8px;margin-top:8px;">' +
+          '<div class="ws-tile filled state-correct">P</div>' +
+          '<div class="ws-tile filled state-present">L</div>' +
+          '<div class="ws-tile filled state-absent">A</div>' +
+          '<div class="ws-tile filled state-absent">N</div>' +
+          '<div class="ws-tile filled state-present">T</div>' +
+        '</div>';
 
-      wrap.innerHTML = `
-        <div class="card" role="dialog" aria-label="How to play Wordscend">
-          <h3>How to Play 🧩</h3>
-          <p>Climb through <strong>4 levels</strong> of daily word puzzles — from 4-letter to 7-letter words. You have <strong>6 tries</strong> per level.</p>
-          <ul style="margin:6px 0 0 18px; color:var(--muted); line-height:1.5;">
-            <li>Type or tap to guess a word of the current length.</li>
-            <li>Tiles turn <strong>green</strong> (correct spot) or <strong>yellow</strong> (in word, wrong spot).</li>
-            <li>Beat a level to advance to the next length.</li>
-            <li>Keep your <strong>🔥 streak</strong> by playing each day.</li>
-          </ul>
-          ${exampleRowHTML}
-          <div class="row" style="margin-top:10px;">
-            <button class="ws-btn primary" data-action="close">Got it</button>
-          </div>
-        </div>
-      `;
+      wrap.innerHTML =
+        '<div class="card" role="dialog" aria-label="How to play Wordscend">' +
+          '<h3>How to Play 🧩</h3>' +
+          '<p>Climb through <strong>4 levels</strong> of daily word puzzles — from 4-letter to 7-letter words. You have <strong>6 tries</strong> per level.</p>' +
+          '<ul style="margin:6px 0 0 18px; color:var(--muted); line-height:1.5;">' +
+            '<li>Type or tap to guess a word of the current length.</li>' +
+            '<li>Tiles turn <strong>green</strong> (correct spot) or <strong>yellow</strong> (in word, wrong spot).</li>' +
+            '<li>Beat a level to advance to the next length.</li>' +
+            '<li>Keep your <strong>🔥 streak</strong> by playing each day.</li>' +
+          '</ul>' +
+          exampleRowHTML +
+          '<div class="row" style="margin-top:10px;">' +
+            '<button class="ws-btn primary" data-action="close">Got it</button>' +
+          '</div>' +
+        '</div>';
 
       document.body.appendChild(wrap);
       wrap.addEventListener('click', (e)=>{
@@ -519,33 +583,32 @@
       const colorblind = localStorage.getItem('ws_colorblind') === '1';
       const themePref = (localStorage.getItem('ws_theme') || 'dark');
 
-      wrap.innerHTML = `
-        <div class="card" role="dialog" aria-label="Settings">
-          <h3>Settings ⚙️</h3>
-          <div class="ws-form">
-            <div class="ws-field">
-              <label for="ws-theme">Theme</label>
-              <select id="ws-theme">
-                <option value="dark"  ${themePref==='dark'?'selected':''}>Dark</option>
-                <option value="light" ${themePref==='light'?'selected':''}>Light</option>
-                <option value="auto"  ${themePref==='auto'?'selected':''}>Auto (system)</option>
-              </select>
-            </div>
-            <div class="ws-field">
-              <label for="ws-sound">Sound effects</label>
-              <input id="ws-sound" type="checkbox" ${sound?'checked':''}/>
-            </div>
-            <div class="ws-field">
-              <label for="ws-cb">Colorblind hints</label>
-              <input id="ws-cb" type="checkbox" ${colorblind?'checked':''}/>
-            </div>
-          </div>
-          <div class="row">
-            <button class="ws-btn primary" data-action="save">Save</button>
-            <button class="ws-btn" data-action="close">Close</button>
-          </div>
-        </div>
-      `;
+      wrap.innerHTML =
+        '<div class="card" role="dialog" aria-label="Settings">' +
+          '<h3>Settings ⚙️</h3>' +
+          '<div class="ws-form">' +
+            '<div class="ws-field">' +
+              '<label for="ws-theme">Theme</label>' +
+              '<select id="ws-theme">' +
+                '<option value="dark" '+(themePref==='dark'?'selected':'')+'>Dark</option>' +
+                '<option value="light" '+(themePref==='light'?'selected':'')+'>Light</option>' +
+                '<option value="auto" '+(themePref==='auto'?'selected':'')+'>Auto (system)</option>' +
+              '</select>' +
+            '</div>' +
+            '<div class="ws-field">' +
+              '<label for="ws-sound">Sound effects</label>' +
+              '<input id="ws-sound" type="checkbox" '+(sound?'checked':'')+' />' +
+            '</div>' +
+            '<div class="ws-field">' +
+              '<label for="ws-cb">Colorblind hints</label>' +
+              '<input id="ws-cb" type="checkbox" '+(colorblind?'checked':'')+' />' +
+            '</div>' +
+          '</div>' +
+          '<div class="row">' +
+            '<button class="ws-btn primary" data-action="save">Save</button>' +
+            '<button class="ws-btn" data-action="close">Close</button>' +
+          '</div>' +
+        '</div>';
       document.body.appendChild(wrap);
 
       wrap.addEventListener('click', (e)=>{
@@ -570,7 +633,40 @@
 
       window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
     },
+
+    /* ---------- hint state helpers ---------- */
+    _hintKey(){
+      const len = (this.config && this.config.cols) ? this.config.cols : 5;
+      return 'ws_hint_'+todayKey()+'_'+len;
+    },
+    _hintAvailable(){
+      if (!this.hintBtn) return false;
+      if (!this.answerMeta || !this.answerMeta.hint) return false;
+      return localStorage.getItem(this._hintKey()) !== '1';
+    },
+    _markHintUsed(){
+      try { localStorage.setItem(this._hintKey(), '1'); } catch{}
+      this._syncHintButtonState();
+    },
+    _restoreHintDisabled(){
+      this._syncHintButtonState();
+    },
+    _syncHintButtonState(){
+      if (!this.hintBtn) return;
+      const hasHint = !!(this.answerMeta && this.answerMeta.hint);
+      const used = !this._hintAvailable();
+      this.hintBtn.style.display = hasHint ? 'grid' : 'none';
+      this.hintBtn.disabled = used;
+      this.hintBtn.title = used ? 'Hint already used today for this level' : 'Hint (–10 pts)';
+      this.hintBtn.setAttribute('aria-disabled', used ? 'true' : 'false');
+    }
   };
+
+  function escapeHtml(s){
+    return String(s || '').replace(/[&<>"']/g, function(ch){
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[ch];
+    });
+  }
 
   global.WordscendUI = UI;
 })(window);
