@@ -1,16 +1,22 @@
 // /assets/js/app.js
 (function () {
   /* ---------------- Utilities ---------------- */
+  const VERSION = 'v4'; // bump to break caches when deploying changes
+
   function loadScript(src) {
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
-      s.src = src;
+      // add a version param to help bust caches on GH Pages / CDNs
+      const url = src + (src.includes('?') ? '&' : '?') + VERSION;
+      s.src = url;
       s.defer = true;
-      s.onload = resolve;
-      s.onerror = () => reject(new Error('Failed to load ' + src));
+      s.crossOrigin = 'anonymous';
+      s.onload = () => resolve(src);
+      s.onerror = () => reject(new Error('Failed to load ' + url));
       document.head.appendChild(s);
     });
   }
+
   async function loadAny(urls){
     let lastErr;
     for (const u of urls){
@@ -56,6 +62,7 @@
   }
 
   /* ---------------- Config ---------------- */
+  // IMPORTANT: host all core/ui/data files under this BASE
   const BASE = 'https://innovative-edge-consulting.github.io/web-games';
   const ANSWERS_URL = `${BASE}/data/answers.json`;
   const ALLOWED_URL = `${BASE}/data/allowed.json`; // optional; falls back to answers
@@ -211,9 +218,14 @@
 
   (async () => {
     // load order matters
-    await loadAny([`${BASE}/core/engine.js?v=state1`, `/core/engine.js?v=state1`]);
-    await loadAny([`${BASE}/ui/dom-view.js?v=state1`, `/ui/dom-view.js?v=state1`]);
-    await loadAny([`${BASE}/core/dictionary.js?v=state1`, `/core/dictionary.js?v=state1`]);
+    await loadAny([`${BASE}/core/engine.js`, `/core/engine.js`]);
+    await loadAny([`${BASE}/ui/dom-view.js`, `/ui/dom-view.js`]);
+    await loadAny([`${BASE}/core/dictionary.js`, `/core/dictionary.js`]);
+
+    // Sanity: verify globals
+    if (!window.WordscendEngine) throw new Error('engine not present');
+    if (!window.WordscendUI)     throw new Error('UI not present');
+    if (!window.WordscendDictionary) throw new Error('dictionary not present');
 
     // Load curated lists (answers + allowed)
     await window.WordscendDictionary.loadCustom(ANSWERS_URL, ALLOWED_URL, { minLen: 4, maxLen: 7 });
@@ -260,7 +272,7 @@
         catch{ clearProgressForLen(levelLen); }
       }
 
-      // Mount AFTER potential hydrate so UI renders current state
+      // Mount AFTER hydrate so UI renders current state
       window.WordscendUI.mount(root, { rows:6, cols: levelLen });
 
       // Provide UI with answer meta so it can show hints/defs
@@ -269,9 +281,8 @@
 
       window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
 
-      // Hook "Hint" button → deduct points once
+      // Hook "Hint" button → deduct points once (UI will call when pressed)
       window.WordscendUI.onHintRequest?.(() => {
-        // Only deduct if not already used (UI protects this; safety double-check)
         window.WordscendApp_addScore(-HINT_PENALTY);
       });
 
@@ -359,6 +370,10 @@
 
   })().catch(err => {
     console.error('[Wordscend] Bootstrap failed:', err);
-    root.innerHTML = '<div style="margin:24px 0;font:600 14px system-ui;color:var(--text);">Failed to load. Please refresh.</div>';
+    const msg = (err && err.message) ? err.message : String(err);
+    root.innerHTML = `
+      <div style="margin:24px 0;font:600 14px system-ui;color:var(--text);">
+        Failed to load. Please refresh.<br/><span style="opacity:.8">(${msg})</span>
+      </div>`;
   });
 })();
