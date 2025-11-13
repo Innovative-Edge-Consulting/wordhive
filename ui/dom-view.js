@@ -106,6 +106,14 @@
       this.root = rootEl;
       this.config = config || { rows:6, cols:5 };
 
+      const colCount = Number(this.config?.cols) || 5;
+      try {
+        document.documentElement.style.setProperty('--ws-cols', colCount);
+      } catch {}
+      try {
+        this.root.style.setProperty('--ws-cols', colCount);
+      } catch {}
+
       Theme.apply(Theme.getPref());
 
       if (!document.querySelector('.ws-page-bg')){
