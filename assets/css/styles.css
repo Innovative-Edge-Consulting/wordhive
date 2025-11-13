@@ -144,12 +144,23 @@ body{
 
 /* ===================== KEYBOARD ===================== */
 .ws-kb{
-  margin-top:8px; display:grid; gap:8px; width:100%; padding:0 12px;
+  margin-top:12px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  max-width:560px;
+  padding:0 8px;
+  box-sizing:border-box;
   -webkit-tap-highlight-color: transparent;
-  max-width:min(560px, calc(var(--tileSize) * var(--ws-cols, 5) + 8px * (var(--ws-cols, 5) - 1) + 48px));
-  margin-left:auto; margin-right:auto;
 }
-.ws-kb-row{ display:grid; grid-auto-flow:column; justify-content:center; gap:6px; }
+.ws-kb-row{
+  display:flex;
+  justify-content:center;
+  gap:6px;
+  width:100%;
+}
 .ws-kb-key{
   font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
   padding:12px 10px; min-width:34px; border-radius:8px;
@@ -183,8 +194,10 @@ body{
   border-radius:12px; padding:10px 14px; font:700 14px/1.25 system-ui;
   box-shadow:var(--bubbleShadow); z-index:55; opacity:0; pointer-events:none;
   transition:opacity .2s ease, transform .2s ease;
+  max-width:min(420px, calc(100vw - 32px));
+  box-sizing:border-box;
 }
-.ws-streak-toast.show{ opacity:1; transform:translate(-50%,0); }
+.ws-streak-toast.show{ opacity:1; transform:translate(-50%,0); pointer-events:auto; }
 .ws-streak-toast .sub{ display:block; font:600 12px/1.2 system-ui; color:var(--muted); margin-top:4px; }
 
 /* Anchored streak tooltip */
@@ -271,29 +284,23 @@ body{
   }
 
   .ws-kb{
-    padding:0 8px;
-    gap:10px;
-    justify-items:center;
+    padding:0 4px;
+    gap:8px;
+    align-items:center;
   }
 
   .ws-kb-row{
     gap:6px;
-    width:auto;
-    grid-auto-flow:column;
+    width:100%;
     justify-content:center;
-    justify-items:center;
+    flex-wrap:wrap;
   }
-  .ws-kb-row:nth-child(1){ grid-template-columns: repeat(10, auto); }
-  .ws-kb-row:nth-child(2){ grid-template-columns: repeat(9,  auto); }
-  .ws-kb-row:nth-child(3){ grid-template-columns: repeat(11, auto); }
 
   .ws-kb-key{
     justify-self:center; min-width:auto; min-height:clamp(40px, 9.8vw, 50px);
     padding:clamp(10px, 2.4vw, 14px) clamp(8px, 2.6vw, 12px);
     font-size:clamp(13px, 3.6vw, 16px); border-radius:10px;
   }
-  .ws-kb-enter, .ws-kb-back{ grid-column:span 2; padding:clamp(10px, 2.4vw, 14px) clamp(10px, 3.2vw, 16px); }
-
   .ws-modal .card, .ws-endcard .card { padding:16px; }
 }
 
