@@ -9,28 +9,46 @@
       const minLen = opts.minLen ?? 4;
       const maxLen = opts.maxLen ?? 7;
 
+      // ---------- Load curated answers (JSON) ----------
       const answersJson = await fetch(answersUrl).then(r => {
         if (!r.ok) throw new Error('answers.json fetch failed');
         return r.json();
       });
 
-      let allowedJson = null;
+      // ---------- Try to load big allowed dictionary ----------
+      let allowedRaw = null; // can be: array (flat list), object (by length), or null
       try {
-        const r = await fetch(allowedUrl);
-        if (!r.ok) throw new Error('allowed.json fetch failed');
-        allowedJson = await r.json();
+        if (allowedUrl) {
+          const r = await fetch(allowedUrl);
+          if (!r.ok) throw new Error('allowed fetch failed');
+          const ct = (r.headers.get('Content-Type') || '').toLowerCase();
+
+          if (ct.includes('application/json')) {
+            // JSON format (e.g. { "4":[...], "5":[...], ... })
+            allowedRaw = await r.json();
+          } else {
+            // Plain text: one word per line
+            const txt = await r.text();
+            const lines = txt.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+            allowedRaw = lines; // flat list of strings
+          }
+        }
       } catch {
-        // Optional; we’ll fall back to answers if missing
-        allowedJson = {};
+        // If allowedUrl fails, we’ll fall back to answers only
+        allowedRaw = null;
       }
 
-      // Helpers
-      const normWord = (w) => (w || '').toUpperCase().trim();
+      // ---------- Helpers ----------
+      const normWord = (w) => (String(w || '')).toUpperCase().trim();
       const isAlpha  = (w) => /^[A-Z]+$/.test(w);
-      const isClean  = (w) => isAlpha(w) && w.length >= minLen && w.length <= maxLen && !/^([A-Z])\1+$/.test(w);
+      const isClean  = (w) =>
+        isAlpha(w) &&
+        w.length >= minLen &&
+        w.length <= maxLen &&
+        !/^([A-Z])\1+$/.test(w); // reject OOOO / AAAAA etc.
 
-      // Normalize entries that can be string or object { w, hint?, def? }
       const normalizeEntry = (entry) => {
+        // entries from answers.json: string or { w, hint?, def? }
         if (typeof entry === 'string') {
           const w = normWord(entry);
           return w && isClean(w) ? { w } : null;
@@ -49,37 +67,53 @@
       this._answersByLen.clear();
       this._metaByWord = new Map();
 
-      // Build answers by length & meta map
+      // ---------- Build answersByLen + meta from curated file ----------
       for (let L = minLen; L <= maxLen; L++) {
-        const key = String(L);
-        const rawArr = Array.isArray(answersJson[key]) ? answersJson[key] : [];
-        const cleanedObjs = rawArr.map(normalizeEntry).filter(Boolean);
-        const wordsOnly = Array.from(new Set(cleanedObjs.map(o => o.w)));
-        this._answersByLen.set(L, wordsOnly);
+        const key   = String(L);
+        const raw   = Array.isArray(answersJson[key]) ? answersJson[key] : [];
+        const objs  = raw.map(normalizeEntry).filter(Boolean);
+        const words = Array.from(new Set(objs.map(o => o.w))); // dedupe
 
-        // capture meta for any word that has it
-        for (const o of cleanedObjs) {
+        this._answersByLen.set(L, words);
+
+        for (const o of objs) {
           if (o.hint || o.def) {
             this._metaByWord.set(o.w, { hint: o.hint, def: o.def });
           }
         }
       }
 
-      // Build allowed set (fallback to answers, extracting .w when needed)
+      // ---------- Build allowed set ----------
       const allowedAll = [];
-      for (let L = minLen; L <= maxLen; L++) {
-        const key = String(L);
-        const src = Array.isArray(allowedJson[key]) ? allowedJson[key] : (answersJson[key] || []);
-        // Safely extract words whether src entries are strings or { w, ... } objects
-        const words = src
-          .map(e => (typeof e === 'string' ? e : (e && typeof e.w === 'string' ? e.w : null)))
-          .filter(Boolean);
-        const cleaned = words.map(normWord).filter(isClean);
-        allowedAll.push(...cleaned);
+
+      if (Array.isArray(allowedRaw)) {
+        // Flat text/array list: one big list for all lengths
+        for (const rawWord of allowedRaw) {
+          const w = normWord(rawWord);
+          if (!isClean(w)) continue;
+          allowedAll.push(w);
+        }
+      } else if (allowedRaw && typeof allowedRaw === 'object') {
+        // JSON by length: { "4":[...], "5":[...], ... }
+        for (let L = minLen; L <= maxLen; L++) {
+          const key = String(L);
+          const src = Array.isArray(allowedRaw[key]) ? allowedRaw[key] : (answersJson[key] || []);
+          const cleaned = src.map(normWord).filter(isClean);
+          allowedAll.push(...cleaned);
+        }
+      } else {
+        // No external allowed list -> fall back to curated answers only
+        for (let L = minLen; L <= maxLen; L++) {
+          const key = String(L);
+          const src = answersJson[key] || [];
+          const cleaned = src.map(normWord).filter(isClean);
+          allowedAll.push(...cleaned);
+        }
       }
+
       this._allowedSet = new Set(allowedAll);
 
-      // Ensure all answers are allowed
+      // Ensure all curated answers are allowed
       for (const list of this._answersByLen.values()) {
         for (const w of list) this._allowedSet.add(w);
       }
