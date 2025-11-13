@@ -296,6 +296,8 @@
         if (e.key === 'Escape') {
           document.querySelector('.ws-modal')?.remove();
           document.querySelector('.ws-endcard')?.remove();
+          document.querySelector('.ws-streak-toast')?.remove();
+          document.querySelector('.ws-streak-tip')?.remove();
           return;
         }
 
@@ -396,17 +398,22 @@
     },
 
     showHintToast(text){
+      // Remove any existing toast first
       document.querySelector('.ws-streak-toast')?.remove();
+
       const t = document.createElement('div');
       t.className = 'ws-streak-toast show';
       t.innerHTML = `<strong>Hint</strong><span class="sub">${text}</span>`;
+
       const row = document.createElement('div');
       row.style.marginTop = '8px';
       row.className = 'row';
+
       const close = document.createElement('button');
       close.className = 'ws-btn';
       close.textContent = 'Close';
       close.addEventListener('click', () => t.remove(), { passive:true });
+
       row.appendChild(close);
       t.appendChild(row);
       document.body.appendChild(t);
@@ -527,12 +534,12 @@
           chip.style.transitionTimingFunction = 'cubic-bezier(.22,.82,.25,1)';
           chip.style.left = `${midX}px`;
           chip.style.top  = `${midY}px`;
-          chip.style.transform = 'translate(-50%, -50%) scale(1.05)';
+          chip.style.transform = 'translate(-50%, -50%) scale(1.05)`;
 
           setTimeout(()=>{
             chip.style.left = `${sRect.left + sRect.width/2}px`;
             chip.style.top  = `${sRect.top  + sRect.height/2}px`;
-            chip.style.transform = 'translate(-50%, -50%) scale(0.8)';
+            chip.style.transform = 'translate(-50%, -50%) scale(0.8)`;
             chip.style.opacity = '0.0';
           }, 160);
         });
