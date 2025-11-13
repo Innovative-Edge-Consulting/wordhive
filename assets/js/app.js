@@ -56,7 +56,7 @@
   }
 
   /* ---------------- Config ---------------- */
-  const BASE = 'https://innovative-edge-consulting.github.io/wordhive';
+  const BASE = 'https://innovative-edge-consulting.github.io/web-games';
   const ANSWERS_URL = `${BASE}/data/answers.json`;
   const ALLOWED_URL = `${BASE}/data/allowed.json`; // optional; falls back to answers
   const SCORE_TABLE = [100, 70, 50, 35, 25, 18]; // per-level bonus
@@ -72,7 +72,10 @@
       streak: {
         current: 0, best: 0, lastPlayDay: null, markedToday: false,
         milestones:[3,7,14,30,50,100], lastMilestoneShown:0,
-        available:0, earnedMonths:[], usedDays:[], toastDayShown:null
+        available:0, earnedMonths:[], usedDays:[], toastDayShown:null,
+        // NEW: hint bank earned via streak
+        hintsAvailable: 0,
+        hintEarnedDays: [] // y-m-d dates when a hint was granted (to avoid double-earn on reload)
       },
       progress: {} // { [len]: { day, state } }
     };
@@ -89,6 +92,9 @@
     if (!Array.isArray(st.earnedMonths)) st.earnedMonths = [];
     if (!Array.isArray(st.usedDays)) st.usedDays = [];
     st.toastDayShown = st.toastDayShown || null;
+    // NEW (hint bank)
+    st.hintsAvailable = Number(st.hintsAvailable || 0);
+    if (!Array.isArray(st.hintEarnedDays)) st.hintEarnedDays = [];
     return st;
   }
   function loadStore() {
@@ -131,6 +137,7 @@
     if (st.markedToday && last === today) return { changed:false };
 
     let usedFreeze=false, earnedFreeze=false, newBest=false, milestone=null;
+    let earnedHint=false; // NEW
 
     if (last === today) {
       st.markedToday = true;
@@ -149,11 +156,23 @@
 
     if ((st.current || 0) > (st.best || 0)) { st.best = st.current; newBest = true; }
 
+    // Freeze earn rule (unchanged): earn 1 per month after reaching day 7 of that month
     if (st.current >= 7) {
       const mk = monthKey(today);
       if (!st.earnedMonths.includes(mk)) { st.earnedMonths.push(mk); st.available += 1; earnedFreeze = true; }
     }
 
+    // NEW: Hint earn rule – earn 1 hint each time the current streak hits a multiple of 5
+    // (5,10,15,20,...) — tweakable later.
+    if (st.current > 0 && st.current % 5 === 0) {
+      if (!st.hintEarnedDays.includes(today)) {
+        st.hintsAvailable += 1;
+        st.hintEarnedDays.push(today);
+        earnedHint = true;
+      }
+    }
+
+    // Milestones (for celebration copy)
     for (const m of st.milestones){ if (st.current >= m && st.lastMilestoneShown < m) milestone = m; }
     if (milestone) st.lastMilestoneShown = milestone;
 
@@ -161,7 +180,12 @@
     const showToast = st.toastDayShown !== today; if (showToast) st.toastDayShown = today;
 
     saveStore(store);
-    return { changed:true, usedFreeze, earnedFreeze, newBest, milestone, showToast };
+    return { changed:true, usedFreeze, earnedFreeze, newBest, milestone, showToast, earnedHint };
+  }
+
+  // Per-day+level hint limiter key (still 1 hint max per level per day)
+  function hintUsedKeyForLen(len){
+    return `ws_hint_used_${todayKey()}_${len}`;
   }
 
   function applyUrlOverrides(store) {
@@ -185,15 +209,16 @@
 
   const store = applyUrlOverrides(loadStore());
 
-  // Global live-score hook used by UI chips — now allows negative scores
+  // Global live-score hook used by UI chips
   window.WordscendApp_addScore = function(delta){
     try {
       const d = Number(delta || 0);
       if (!isFinite(d) || d === 0) return;
-      store.score = (store.score || 0) + d; // removed clamp to 0
+      // Allow negative score (requested)
+      store.score = (store.score || 0) + d;
       saveStore(store);
       if (window.WordscendUI) {
-        window.WordscendUI.setHUD(`Level ${store.levelIndex+1}/4`, store.score, store.streak.current);
+        window.WordscendUI.setHUD(`Level ${store.levelIndex+1}/4`, store.score, store.streak.current, store.streak.hintsAvailable);
       }
     } catch {}
   };
@@ -241,6 +266,22 @@
       }
     }
 
+    function canUseHintForLen(len){
+      // Must have banked hints AND not used a hint for this level today
+      const k = hintUsedKeyForLen(len);
+      const usedForLevel = localStorage.getItem(k) === '1';
+      return !usedForLevel && (store.streak.hintsAvailable > 0);
+    }
+
+    function useHintForLen(len){
+      const k = hintUsedKeyForLen(len);
+      localStorage.setItem(k, '1');
+      store.streak.hintsAvailable = Math.max(0, (store.streak.hintsAvailable || 0) - 1);
+      saveStore(store);
+      // Refresh HUD so “💡 Hints” decrements immediately
+      window.WordscendUI.setHUD(`Level ${store.levelIndex+1}/4`, store.score, store.streak.current, store.streak.hintsAvailable);
+    }
+
     async function startLevel(idx){
       const levelLen = LEVEL_LENGTHS[idx];
 
@@ -267,10 +308,16 @@
       const meta = window.WordscendDictionary.getMeta(answer);
       window.WordscendUI.setAnswerMeta?.(answer, meta);
 
-      window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
+      // NEW: pass hintsAvailable to HUD
+      window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current, store.streak.hintsAvailable);
 
-      // Wire Hint: UI will ask us to charge points only after user confirms
-      window.WordscendUI.onHintRequest?.(() => {
+      // Hook Hint UX:
+      // 1) UI asks if user wants to spend a hint (confirm dialog lives in UI)
+      // 2) If confirmed, app checks bank/per-level limit, consumes, then subtracts points
+      window.WordscendUI.onHintCheck?.(() => canUseHintForLen(levelLen));
+      window.WordscendUI.onHintConsume?.(() => {
+        useHintForLen(levelLen);
+        // Deduct points even if it sends score negative (as requested)
         window.WordscendApp_addScore(-HINT_PENALTY);
       });
 
@@ -282,14 +329,16 @@
         if (res && res.ok) {
           const stInfo = markPlayedToday(store);
           if (stInfo && stInfo.changed){
-            window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
+            window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current, store.streak.hintsAvailable);
             if (stInfo.showToast){
               window.WordscendUI.showStreakToast?.(store.streak.current, {
                 usedFreeze: stInfo.usedFreeze,
                 earnedFreeze: stInfo.earnedFreeze,
                 milestone: stInfo.milestone,
                 newBest: stInfo.newBest,
-                freezesAvail: store.streak.available
+                freezesAvail: store.streak.available,
+                earnedHint: stInfo.earnedHint,
+                hintsAvail: store.streak.hintsAvailable
               });
             }
           }
@@ -307,7 +356,7 @@
             store.score += gained;
             saveStore(store);
 
-            window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current);
+            window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current, store.streak.hintsAvailable);
             window.WordscendUI.showBubble(`+${gained} pts`);
 
             const isLast = (idx === LEVEL_LENGTHS.length - 1);
@@ -348,7 +397,7 @@
 
     function mountBlankStage(){
       window.WordscendUI.mount(root, { rows:6, cols:5 });
-      window.WordscendUI.setHUD(`Level ${store.levelIndex+1}/4`, store.score, store.streak.current);
+      window.WordscendUI.setHUD(`Level ${store.levelIndex+1}/4`, store.score, store.streak.current, store.streak.hintsAvailable);
     }
 
     // Persist on unload as a safety
