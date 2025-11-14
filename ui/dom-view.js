@@ -10,9 +10,15 @@
   const Theme = {
     media: null,
     current: null,
-    getPref() { return localStorage.getItem('ws_theme') || 'dark'; },
-    setPref(v){ try{ localStorage.setItem('ws_theme', v); }catch{} },
-    systemIsDark(){
+    getPref() {
+      return localStorage.getItem('ws_theme') || 'dark';
+    },
+    setPref(v) {
+      try {
+        localStorage.setItem('ws_theme', v);
+      } catch {}
+    },
+    systemIsDark() {
       this.media = this.media || window.matchMedia('(prefers-color-scheme: dark)');
       return this.media.matches;
     },
@@ -20,26 +26,26 @@
       this.current = pref;
       const el = document.documentElement;
       if (pref === 'auto') {
-        el.setAttribute('data-theme', this.systemIsDark() ? 'dark':'light');
+        el.setAttribute('data-theme', this.systemIsDark() ? 'dark' : 'light');
         this.listenSystem();
       } else {
         el.setAttribute('data-theme', pref);
         this.unlistenSystem();
       }
     },
-    listenSystem(){
+    listenSystem() {
       this.media = this.media || window.matchMedia('(prefers-color-scheme: dark)');
-      if (!this._bound){
-        this._bound = (e)=> {
+      if (!this._bound) {
+        this._bound = (e) => {
           if (this.current === 'auto') {
-            document.documentElement.setAttribute('data-theme', e.matches ? 'dark':'light');
+            document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
           }
         };
         this.media.addEventListener?.('change', this._bound);
       }
     },
-    unlistenSystem(){
-      if (this.media && this._bound){
+    unlistenSystem() {
+      if (this.media && this._bound) {
         this.media.removeEventListener?.('change', this._bound);
       }
       this._bound = null;
@@ -49,45 +55,66 @@
   /* ---------- Tiny sound ---------- */
   const AudioFX = {
     _ctx: null,
-    _enabled() { return (localStorage.getItem('ws_sound') !== '0'); },
+    _enabled() {
+      return (localStorage.getItem('ws_sound') !== '0');
+    },
     _ensure() {
       if (!this._ctx) {
-        try { this._ctx = new (window.AudioContext||window.webkitAudioContext)(); }
-        catch {}
+        try {
+          this._ctx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch {}
       }
       return this._ctx;
     },
     _resumeIfNeeded() {
       const ctx = this._ctx;
       if (!ctx) return;
-      if (ctx.state === 'suspended') { ctx.resume().catch(()=>{}); }
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
     },
     armAutoResumeOnce() {
       if (this._armed) return;
       this._armed = true;
-      const resume = () => { if (this._ctx) this._resumeIfNeeded(); };
-      window.addEventListener('pointerdown', resume, { passive:true });
+      const resume = () => {
+        if (this._ctx) this._resumeIfNeeded();
+      };
+      window.addEventListener('pointerdown', resume, { passive: true });
       window.addEventListener('keydown', resume);
     },
     ding() {
       if (!this._enabled()) return;
-      const ctx = this._ensure(); if (!ctx) return; this._resumeIfNeeded();
+      const ctx = this._ensure(); if (!ctx) return;
+      this._resumeIfNeeded();
       const o = ctx.createOscillator();
       const g = ctx.createGain();
-      o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.08;
-      o.connect(g); g.connect(ctx.destination);
+      o.type = 'sine';
+      o.frequency.value = 880;
+      g.gain.value = 0.08;
+      o.connect(g);
+      g.connect(ctx.destination);
       const now = ctx.currentTime;
       o.start(now);
       g.gain.setValueAtTime(0.10, now);
       g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
       o.stop(now + 0.2);
     },
-    chime(){
+    chime() {
       if (!this._enabled()) return;
-      const ctx=this._ensure(); if (!ctx) return; this._resumeIfNeeded();
-      const o=ctx.createOscillator(), g=ctx.createGain();
-      o.type='triangle'; o.frequency.value=660; g.gain.value=0.06; o.connect(g); g.connect(ctx.destination);
-      const t=ctx.currentTime; o.start(t); g.gain.setValueAtTime(0.07,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.25); o.stop(t+0.28);
+      const ctx = this._ensure(); if (!ctx) return;
+      this._resumeIfNeeded();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = 660;
+      g.gain.value = 0.06;
+      o.connect(g);
+      g.connect(ctx.destination);
+      const t = ctx.currentTime;
+      o.start(t);
+      g.gain.setValueAtTime(0.07, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+      o.stop(t + 0.28);
     }
   };
   AudioFX.armAutoResumeOnce();
@@ -96,9 +123,9 @@
     mount(rootEl, config) {
       if (!rootEl) return;
       this.root = rootEl;
-      this.config = config || { rows:6, cols:5 };
+      this.config = config || { rows: 6, cols: 5 };
 
-      const colCount = Number(this.config?.cols) || 5;
+      const colCount = Number(this.config && this.config.cols) || 5;
       try {
         document.documentElement.style.setProperty('--ws-cols', colCount);
       } catch {}
@@ -108,9 +135,9 @@
 
       Theme.apply(Theme.getPref());
 
-      if (!document.querySelector('.ws-page-bg')){
+      if (!document.querySelector('.ws-page-bg')) {
         const bg = document.createElement('div');
-        bg.className='ws-page-bg';
+        bg.className = 'ws-page-bg';
         document.body.appendChild(bg);
       }
 
@@ -118,19 +145,19 @@
         <div class="ws-topbar">
           <div class="ws-topbar-inner">
             <div class="ws-brand" role="banner" aria-label="WordHive">
-              <img src="assets/wordhive-logo.png" alt="WordHive logo" class="ws-logo" />
+              <img src="assets/wordhive-logo.png" alt="WordHive logo" class="ws-logo">
             </div>
             <div class="ws-actions">
               <button class="icon-btn" id="ws-info" type="button" title="How to play" aria-label="How to play">
                 <svg viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
-                  <path d="M12 8.5h.01M11 11.5h1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"></circle>
+                  <path d="M12 8.5h.01M11 11.5h1v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
                 </svg>
               </button>
               <button class="icon-btn" id="ws-settings" type="button" title="Settings" aria-label="Settings">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.89 3.31.876 2.42 2.42a1.724 1.724 0 0 0 1.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.89 1.543-.876 3.31-2.42 2.42a1.724 1.724 0 0 0-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.89-3.31-.876-2.42-2.42a1.724 1.724 0 0 0-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.89-1.543.876-3.31 2.42-2.42.996.574 2.273.097 2.573-1.065Z"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.89 3.31.876 2.42 2.42a1.724 1.724 0 0 0 1.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.89 1.543-.876 3.31-2.42 2.42a1.724 1.724 0 0 0-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.89-3.31-.876-2.42-2.42a1.724 1.724 0 0 0-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.89-1.543.876-3.31 2.42-2.42c.996.574 2.273.097 2.573-1.065Z"
                     stroke="currentColor"
                     stroke-width="1.5"
                     stroke-linecap="round"
@@ -170,11 +197,11 @@
       this.levelEl = this.root.querySelector('#ws-level');
       this.scoreEl = this.root.querySelector('#ws-score');
       this.hintsEl = this.root.querySelector('#ws-hints');
-      this.streakEl= this.root.querySelector('#ws-streak');
+      this.streakEl = this.root.querySelector('#ws-streak');
       this.stageEl = this.root.querySelector('.ws-stage');
-      this.gridEl  = this.root.querySelector('.ws-grid');
-      this.kbEl    = this.root.querySelector('.ws-kb');
-      this.bubble  = this.root.querySelector('#ws-bubble');
+      this.gridEl = this.root.querySelector('.ws-grid');
+      this.kbEl = this.root.querySelector('.ws-kb');
+      this.bubble = this.root.querySelector('#ws-bubble');
 
       // HUD tooltips
       this.bindHudTips();
@@ -188,37 +215,37 @@
       this.bindKbClicks();
     },
 
-    setHUD(levelText, score, streak, hintsAvail){
+    setHUD(levelText, score, streak, hintsAvail) {
       if (this.levelEl)  this.levelEl.textContent  = levelText;
       if (this.scoreEl)  this.scoreEl.textContent  = `Score: ${score}`;
       if (this.hintsEl)  this.hintsEl.textContent  = `💡 Hints ${hintsAvail ?? 0}`;
       if (this.streakEl) this.streakEl.textContent = `🔥 Streak ${streak ?? 0}`;
     },
 
-    bindHudTips(){
-      this.streakEl?.addEventListener('click', () => {
+    bindHudTips() {
+      this.streakEl && this.streakEl.addEventListener('click', () => {
         const msg = 'Keep your streak by playing every day. You can also earn a freeze at day 7 of a month (auto-used on a 1-day gap).';
         this.showAnchoredTip(this.streakEl, 'Streak info', msg);
-      }, { passive:true });
+      }, { passive: true });
 
-      this.hintsEl?.addEventListener('click', () => {
+      this.hintsEl && this.hintsEl.addEventListener('click', () => {
         const msg = 'Earn 1 hint every 5-day streak milestone. Hints are banked, but you can use at most 1 per level each day.';
         this.showAnchoredTip(this.hintsEl, 'Hint bank', msg);
-      }, { passive:true });
+      }, { passive: true });
     },
 
     /* ---------- Header ---------- */
-    bindHeader(){
+    bindHeader() {
       const info = this.root.querySelector('#ws-info');
       const settings = this.root.querySelector('#ws-settings');
-      info?.addEventListener('click', ()=> this.showRulesModal(), { passive:true });
-      settings?.addEventListener('click', ()=> this.showSettingsModal(), { passive:true });
+      info && info.addEventListener('click', () => this.showRulesModal(), { passive: true });
+      settings && settings.addEventListener('click', () => this.showSettingsModal(), { passive: true });
     },
 
     /* ---------- Rendering ---------- */
     renderGrid() {
-      const board  = global.WordscendEngine.getBoard();
-      const marks  = global.WordscendEngine.getRowMarks();
+      const board = global.WordscendEngine.getBoard();
+      const marks = global.WordscendEngine.getRowMarks();
       const cursor = global.WordscendEngine.getCursor();
 
       this.gridEl.innerHTML = '';
@@ -236,15 +263,15 @@
           const ch = row[c] || '';
           tile.textContent = ch;
 
-          const mark = marks[r]?.[c];
+          const mark = marks[r] && marks[r][c];
           if (mark) tile.classList.add('state-' + mark);
 
           if (ch) tile.classList.add('filled');
           if (r === cursor.row && c === cursor.col && !global.WordscendEngine.isDone()) {
             tile.classList.add('active');
           }
-          tile.dataset.row = r;
-          tile.dataset.col = c;
+          tile.dataset.row = String(r);
+          tile.dataset.col = String(c);
           rowEl.appendChild(tile);
         }
 
@@ -272,8 +299,13 @@
           if (key === 'Enter') {
             btn.classList.add('ws-kb-enter');
             btn.dataset.key = 'Enter';
-            if (isMobile){ btn.textContent = '⏎'; btn.setAttribute('aria-label','Enter'); btn.title='Enter'; }
-            else { btn.textContent = 'Enter'; }
+            if (isMobile) {
+              btn.textContent = '⏎';
+              btn.setAttribute('aria-label', 'Enter');
+              btn.title = 'Enter';
+            } else {
+              btn.textContent = 'Enter';
+            }
           } else if (key === 'Back') {
             btn.classList.add('ws-kb-back');
             btn.textContent = '⌫';
@@ -332,20 +364,23 @@
       if (/^[A-Za-z]$/.test(key)) {
         if (global.WordscendEngine.addLetter(key)) {
           this.renderGrid();
-          global.WordscendApp_onStateChange?.({ type: 'letter' });
+          global.WordscendApp_onStateChange && global.WordscendApp_onStateChange({ type: 'letter' });
         }
         return;
       }
       if (key === 'Backspace') {
         if (global.WordscendEngine.backspace()) {
           this.renderGrid();
-          global.WordscendApp_onStateChange?.({ type: 'backspace' });
+          global.WordscendApp_onStateChange && global.WordscendApp_onStateChange({ type: 'backspace' });
         }
         return;
       }
       if (key === 'Enter') {
         const cur = global.WordscendEngine.getCursor();
-        if (cur.col === 0){ this.showBubble('Type a word first'); return; }
+        if (cur.col === 0) {
+          this.showBubble('Type a word first');
+          return;
+        }
 
         const res = global.WordscendEngine.submitRow();
         if (!res.ok && res.reason === 'incomplete') {
@@ -366,7 +401,7 @@
           setTimeout(() => this.renderGrid(), 420 + (this.config.cols - 1) * 80);
         }
         if (res.ok) {
-          global.WordscendApp_onStateChange?.({ type: 'submit', result: res });
+          global.WordscendApp_onStateChange && global.WordscendApp_onStateChange({ type: 'submit', result: res });
         }
         return;
       }
@@ -374,24 +409,24 @@
 
     /* ---------- Hint UX ---------- */
     _answerMeta: null,
-    setAnswerMeta(answer, meta){
+    setAnswerMeta(answer, meta) {
       this._answerMeta = { answer, meta };
-      if (!this._hintBtn){
+      if (!this._hintBtn) {
         const btn = document.createElement('button');
         btn.className = 'ws-btn';
         btn.textContent = 'Show Hint';
         btn.style.marginTop = '6px';
-        btn.addEventListener('click', () => this.requestHintFlow(), { passive:true });
-        this.stageEl?.prepend(btn);
+        btn.addEventListener('click', () => this.requestHintFlow(), { passive: true });
+        this.stageEl && this.stageEl.prepend(btn);
         this._hintBtn = btn;
       }
     },
     onHintCheck: null,
     onHintConsume: null,
 
-    requestHintFlow(){
+    requestHintFlow() {
       const canUse = (typeof this.onHintCheck === 'function') ? !!this.onHintCheck() : false;
-      if (!canUse){
+      if (!canUse) {
         this.showBubble('No hint available for this level');
         return;
       }
@@ -400,13 +435,13 @@
         try {
           if (typeof this.onHintConsume === 'function') this.onHintConsume();
         } catch {}
-        const meta = this._answerMeta?.meta || {};
+        const meta = (this._answerMeta && this._answerMeta.meta) || {};
         const hintText = (meta && meta.hint) ? String(meta.hint) : 'No hint available for this word.';
         this.showHintToast(hintText);
       });
     },
 
-    showHintToast(text){
+    showHintToast(text) {
       // Remove any existing toast first
       document.querySelector('.ws-streak-toast')?.remove();
 
@@ -421,14 +456,14 @@
       const close = document.createElement('button');
       close.className = 'ws-btn';
       close.textContent = 'Close';
-      close.addEventListener('click', () => t.remove(), { passive:true });
+      close.addEventListener('click', () => t.remove(), { passive: true });
 
       row.appendChild(close);
       t.appendChild(row);
       document.body.appendChild(t);
     },
 
-    showConfirm(title, message, cb){
+    showConfirm(title, message, cb) {
       document.querySelector('.ws-modal')?.remove();
       const wrap = document.createElement('div');
       wrap.className = 'ws-modal';
@@ -453,20 +488,25 @@
           return;
         }
         const act = btn.dataset.action;
-        if (act === 'ok'){
+        if (act === 'ok') {
           cb && cb(true);
           wrap.remove();
         }
-        if (act === 'cancel'){
+        if (act === 'cancel') {
           cb && cb(false);
           wrap.remove();
         }
       };
-      wrap.addEventListener('click', handler, { passive:true });
-      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ cb && cb(false); wrap.remove(); }}, { once:true });
+      wrap.addEventListener('click', handler, { passive: true });
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          cb && cb(false);
+          wrap.remove();
+        }
+      }, { once: true });
     },
 
-    showAnchoredTip(anchorEl, title, text){
+    showAnchoredTip(anchorEl, title, text) {
       document.querySelector('.ws-streak-tip')?.remove();
       if (!anchorEl) return;
       const r = anchorEl.getBoundingClientRect();
@@ -475,11 +515,16 @@
       tip.innerHTML = `<strong>${title}</strong><div class="sub" style="margin-top:6px;">${text}</div>`;
       tip.style.position = 'fixed';
       tip.style.left = `${r.left}px`;
-      tip.style.top  = `${r.bottom + 8}px`;
+      tip.style.top = `${r.bottom + 8}px`;
       document.body.appendChild(tip);
-      requestAnimationFrame(()=> tip.classList.add('show'));
-      const close = () => { tip.remove(); window.removeEventListener('click', away, true); };
-      const away = (e) => { if (!tip.contains(e.target)) close(); };
+      requestAnimationFrame(() => tip.classList.add('show'));
+      const close = () => {
+        tip.remove();
+        window.removeEventListener('click', away, true);
+      };
+      const away = (e) => {
+        if (!tip.contains(e.target)) close();
+      };
       window.addEventListener('click', away, true);
     },
 
@@ -498,7 +543,7 @@
         setTimeout(() => {
           const mark = marks[i];
           if (mark) {
-            tile.classList.remove('state-correct','state-present','state-absent');
+            tile.classList.remove('state-correct', 'state-present', 'state-absent');
             tile.classList.add('state-' + mark);
 
             if (mark === 'correct') {
@@ -532,8 +577,8 @@
       this._bT = setTimeout(() => this.bubble.classList.remove('show'), 1400);
     },
 
-    floatPointsFromTile(tileEl, delta, color='green'){
-      try{
+    floatPointsFromTile(tileEl, delta, color = 'green') {
+      try {
         const scoreEl = this.scoreEl;
         if (!tileEl || !scoreEl) return;
 
@@ -541,40 +586,40 @@
         const sRect = scoreEl.getBoundingClientRect();
 
         const chip = document.createElement('div');
-        chip.className = `ws-fxfloat ${color==='green' ? 'green' : 'yellow'}`;
+        chip.className = `ws-fxfloat ${color === 'green' ? 'green' : 'yellow'}`;
         chip.textContent = (delta > 0 ? `+${delta}` : `${delta}`);
-        chip.style.left = `${tRect.left + tRect.width/2}px`;
-        chip.style.top  = `${tRect.top  + tRect.height/2}px`;
+        chip.style.left = `${tRect.left + tRect.width / 2}px`;
+        chip.style.top = `${tRect.top + tRect.height / 2}px`;
         chip.style.transform = 'translate(-50%, -50%) scale(1)';
         document.body.appendChild(chip);
 
-        requestAnimationFrame(()=>{
-          const midX = (tRect.left + sRect.left)/2;
+        requestAnimationFrame(() => {
+          const midX = (tRect.left + sRect.left) / 2;
           const midY = Math.min(tRect.top, sRect.top) - 40;
 
           chip.style.transitionTimingFunction = 'cubic-bezier(.22,.82,.25,1)';
           chip.style.left = `${midX}px`;
-          chip.style.top  = `${midY}px`;
+          chip.style.top = `${midY}px`;
           chip.style.transform = 'translate(-50%, -50%) scale(1.05)';
 
-          setTimeout(()=>{
-            chip.style.left = `${sRect.left + sRect.width/2}px`;
-            chip.style.top  = `${sRect.top  + sRect.height/2}px`;
+          setTimeout(() => {
+            chip.style.left = `${sRect.left + sRect.width / 2}px`;
+            chip.style.top = `${sRect.top + sRect.height / 2}px`;
             chip.style.transform = 'translate(-50%, -50%) scale(0.8)';
             chip.style.opacity = '0.0';
           }, 160);
         });
 
-        setTimeout(()=>{
+        setTimeout(() => {
           chip.remove();
           if (typeof window.WordscendApp_addScore === 'function') {
             window.WordscendApp_addScore(delta);
           }
           scoreEl.classList.remove('pulse'); void scoreEl.offsetWidth;
           scoreEl.classList.add('pulse');
-          setTimeout(()=>scoreEl.classList.remove('pulse'), 260);
+          setTimeout(() => scoreEl.classList.remove('pulse'), 260);
         }, 480);
-      }catch{}
+      } catch {}
     },
 
     showEndCard(score, streakCurrent = 0, streakBest = 0) {
@@ -603,20 +648,34 @@
         const act = btn.dataset.action;
         if (act === 'close') wrap.remove();
         if (act === 'copy') {
-          try { await navigator.clipboard.writeText(shareText); btn.textContent = 'Copied!'; }
-          catch { btn.textContent = 'Copy failed'; }
+          try {
+            await navigator.clipboard.writeText(shareText);
+            btn.textContent = 'Copied!';
+          } catch {
+            btn.textContent = 'Copy failed';
+          }
         }
         if (act === 'share') {
           if (navigator.share) {
-            try { await navigator.share({ text: shareText }); } catch{}
+            try {
+              await navigator.share({ text: shareText });
+            } catch {}
           } else {
-            try { await navigator.clipboard.writeText(shareText); btn.textContent = 'Copied!'; }
-            catch { btn.textContent = 'Share not supported'; }
+            try {
+              await navigator.clipboard.writeText(shareText);
+              btn.textContent = 'Copied!';
+            } catch {
+              btn.textContent = 'Share not supported';
+            }
           }
         }
-      }, { passive:true });
+      }, { passive: true });
 
-      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          wrap.remove();
+        }
+      }, { once: true });
     },
 
     /* ---------- Modals ---------- */
@@ -653,10 +712,16 @@
       `;
 
       document.body.appendChild(wrap);
-      wrap.addEventListener('click', (e)=>{
-        if (e.target.dataset.action === 'close' || e.target === wrap) wrap.remove();
-      }, { passive:true });
-      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
+      wrap.addEventListener('click', (e) => {
+        if (e.target.dataset.action === 'close' || e.target === wrap) {
+          wrap.remove();
+        }
+      }, { passive: true });
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          wrap.remove();
+        }
+      }, { once: true });
     },
 
     showSettingsModal() {
@@ -665,7 +730,6 @@
       wrap.className = 'ws-modal';
 
       const sound = localStorage.getItem('ws_sound') !== '0';
-      const colorblind = localStorage.getItem('ws_colorblind') === '1';
       const themePref = (localStorage.getItem('ws_theme') || 'dark');
 
       wrap.innerHTML = `
@@ -675,18 +739,14 @@
             <div class="ws-field">
               <label for="ws-theme">Theme</label>
               <select id="ws-theme">
-                <option value="dark"  ${themePref==='dark'?'selected':''}>Dark</option>
-                <option value="light" ${themePref==='light'?'selected':''}>Light</option>
-                <option value="auto"  ${themePref==='auto'?'selected':''}>Auto (system)</option>
+                <option value="dark"  ${themePref === 'dark' ? 'selected' : ''}>Dark</option>
+                <option value="light" ${themePref === 'light' ? 'selected' : ''}>Light</option>
+                <option value="auto"  ${themePref === 'auto' ? 'selected' : ''}>Auto (system)</option>
               </select>
             </div>
             <div class="ws-field">
               <label for="ws-sound">Sound effects</label>
-              <input id="ws-sound" type="checkbox" ${sound?'checked':''}/>
-            </div>
-            <div class="ws-field">
-              <label for="ws-cb">Colorblind hints</label>
-              <input id="ws-cb" type="checkbox" ${colorblind?'checked':''}/>
+              <input id="ws-sound" type="checkbox" ${sound ? 'checked' : ''}/>
             </div>
           </div>
           <div class="row">
@@ -697,28 +757,33 @@
       `;
       document.body.appendChild(wrap);
 
-      wrap.addEventListener('click', (e)=>{
+      wrap.addEventListener('click', (e) => {
         const btn = e.target.closest('button[data-action]');
-        if (!btn) { if (e.target === wrap) wrap.remove(); return; }
+        if (!btn) {
+          if (e.target === wrap) wrap.remove();
+          return;
+        }
         const act = btn.dataset.action;
-        if (act === 'save'){
+        if (act === 'save') {
           const theme = wrap.querySelector('#ws-theme').value;
           const s = wrap.querySelector('#ws-sound').checked;
-          const cb= wrap.querySelector('#ws-cb').checked;
           try {
             Theme.setPref(theme);
             Theme.apply(theme);
-            localStorage.setItem('ws_sound', s ? '1':'0');
-            localStorage.setItem('ws_colorblind', cb ? '1':'0');
+            localStorage.setItem('ws_sound', s ? '1' : '0');
           } catch {}
-          btn.textContent='Saved';
-          setTimeout(()=>wrap.remove(), 420);
+          btn.textContent = 'Saved';
+          setTimeout(() => wrap.remove(), 420);
         }
         if (act === 'close') wrap.remove();
-      }, { passive:true });
+      }, { passive: true });
 
-      window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
-    },
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          wrap.remove();
+        }
+      }, { once: true });
+    }
   };
 
   global.WordscendUI = UI;
