@@ -11,7 +11,7 @@
     media: null,
     current: null,
     getPref() { return localStorage.getItem('ws_theme') || 'dark'; },
-    setPref(v){ try{ localStorage.setItem('ws_theme', v); }catch(e){} },
+    setPref(v){ try{ localStorage.setItem('ws_theme', v); }catch{} },
     systemIsDark(){
       this.media = this.media || window.matchMedia('(prefers-color-scheme: dark)');
       return this.media.matches;
@@ -49,12 +49,11 @@
   /* ---------- Tiny sound ---------- */
   const AudioFX = {
     _ctx: null,
-    _armed: false,
     _enabled() { return (localStorage.getItem('ws_sound') !== '0'); },
     _ensure() {
       if (!this._ctx) {
         try { this._ctx = new (window.AudioContext||window.webkitAudioContext)(); }
-        catch(e){}
+        catch {}
       }
       return this._ctx;
     },
@@ -88,59 +87,41 @@
       const ctx=this._ensure(); if (!ctx) return; this._resumeIfNeeded();
       const o=ctx.createOscillator(), g=ctx.createGain();
       o.type='triangle'; o.frequency.value=660; g.gain.value=0.06; o.connect(g); g.connect(ctx.destination);
-      const t=ctx.currentTime;
-      o.start(t);
-      g.gain.setValueAtTime(0.07,t);
-      g.gain.exponentialRampToValueAtTime(0.0001,t+0.25);
-      o.stop(t+0.28);
+      const t=ctx.currentTime; o.start(t); g.gain.setValueAtTime(0.07,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.25); o.stop(t+0.28);
     }
   };
   AudioFX.armAutoResumeOnce();
 
   const UI = {
-    root: null,
-    config: null,
-    levelEl: null,
-    scoreEl: null,
-    hintsEl: null,
-    streakEl: null,
-    stageEl: null,
-    gridEl: null,
-    kbEl: null,
-    bubble: null,
-    _keyBound: false,
-    _kbClickBound: false,
-    _answerMeta: null,
-    _hintBtn: null,
-    _bT: null,
-
     mount(rootEl, config) {
       if (!rootEl) return;
       this.root = rootEl;
       this.config = config || { rows:6, cols:5 };
 
-      const colCount = Number(this.config && this.config.cols) || 5;
+      const colCount = Number(this.config?.cols) || 5;
       try {
         document.documentElement.style.setProperty('--ws-cols', colCount);
-      } catch(e){}
+      } catch {}
       try {
         this.root.style.setProperty('--ws-cols', colCount);
-      } catch(e){}
+      } catch {}
 
       Theme.apply(Theme.getPref());
 
       if (!document.querySelector('.ws-page-bg')){
-        const bg = document.createElement('div'); bg.className='ws-page-bg'; document.body.appendChild(bg);
+        const bg = document.createElement('div');
+        bg.className = 'ws-page-bg';
+        document.body.appendChild(bg);
       }
 
       this.root.innerHTML = `
         <div class="ws-topbar">
           <div class="ws-topbar-inner">
             <div class="ws-brand" role="banner" aria-label="WordHive">
-              <span class="ws-logo-tile ws-logo-tile--correct">W</span>
-              <span class="ws-logo-text">ord</span>
-              <span class="ws-logo-tile ws-logo-tile--present">H</span>
-              <span class="ws-logo-text">ive</span>
+              <span class="ws-brand-block ws-brand-block-w">W</span>
+              <span class="ws-brand-text">ord</span>
+              <span class="ws-brand-block ws-brand-block-h">H</span>
+              <span class="ws-brand-text">ive</span>
             </div>
             <div class="ws-actions">
               <button class="icon-btn" id="ws-info" type="button" title="How to play" aria-label="How to play">
@@ -206,6 +187,7 @@
 
       this.bindHeader();
       this.bindKeyboard();
+      this._kbClickBound = false;
       this.bindKbClicks();
     },
 
@@ -217,36 +199,27 @@
     },
 
     bindHudTips(){
-      if (this.streakEl){
-        this.streakEl.addEventListener('click', () => {
-          const msg = 'Keep your streak by playing every day. You can also earn a freeze at day 7 of a month (auto-used on a 1-day gap).';
-          this.showAnchoredTip(this.streakEl, 'Streak info', msg);
-        }, { passive:true });
-      }
+      this.streakEl?.addEventListener('click', () => {
+        const msg = 'Keep your streak by playing every day. You can also earn a freeze at day 7 of a month (auto-used on a 1-day gap).';
+        this.showAnchoredTip(this.streakEl, 'Streak info', msg);
+      }, { passive:true });
 
-      if (this.hintsEl){
-        this.hintsEl.addEventListener('click', () => {
-          const msg = 'Earn 1 hint every 5-day streak milestone. Hints are banked, but you can use at most 1 per level each day.';
-          this.showAnchoredTip(this.hintsEl, 'Hint bank', msg);
-        }, { passive:true });
-      }
+      this.hintsEl?.addEventListener('click', () => {
+        const msg = 'Earn 1 hint every 5-day streak milestone. Hints are banked, but you can use at most 1 per level each day.';
+        this.showAnchoredTip(this.hintsEl, 'Hint bank', msg);
+      }, { passive:true });
     },
 
     /* ---------- Header ---------- */
     bindHeader(){
       const info = this.root.querySelector('#ws-info');
       const settings = this.root.querySelector('#ws-settings');
-      if (info){
-        info.addEventListener('click', ()=> this.showRulesModal(), { passive:true });
-      }
-      if (settings){
-        settings.addEventListener('click', ()=> this.showSettingsModal(), { passive:true });
-      }
+      info?.addEventListener('click', ()=> this.showRulesModal(), { passive:true });
+      settings?.addEventListener('click', ()=> this.showSettingsModal(), { passive:true });
     },
 
     /* ---------- Rendering ---------- */
     renderGrid() {
-      if (!global.WordscendEngine || !this.gridEl) return;
       const board  = global.WordscendEngine.getBoard();
       const marks  = global.WordscendEngine.getRowMarks();
       const cursor = global.WordscendEngine.getCursor();
@@ -266,15 +239,15 @@
           const ch = row[c] || '';
           tile.textContent = ch;
 
-          const mark = marks[r] && marks[r][c];
+          const mark = marks[r]?.[c];
           if (mark) tile.classList.add('state-' + mark);
 
           if (ch) tile.classList.add('filled');
           if (r === cursor.row && c === cursor.col && !global.WordscendEngine.isDone()) {
             tile.classList.add('active');
           }
-          tile.dataset.row = String(r);
-          tile.dataset.col = String(c);
+          tile.dataset.row = r;
+          tile.dataset.col = c;
           rowEl.appendChild(tile);
         }
 
@@ -284,7 +257,6 @@
     },
 
     renderKeyboard() {
-      if (!this.kbEl || !global.WordscendEngine) return;
       const status = global.WordscendEngine.getKeyStatus();
       this.kbEl.innerHTML = '';
 
@@ -355,7 +327,6 @@
       if (this._kbClickBound) return;
       this._kbClickBound = true;
 
-      if (!this.kbEl) return;
       this.kbEl.addEventListener('pointerup', (e) => {
         const btn = e.target.closest('.ws-kb-key');
         if (!btn) return;
@@ -366,22 +337,17 @@
     },
 
     handleInput(key) {
-      if (!global.WordscendEngine) return;
       if (/^[A-Za-z]$/.test(key)) {
         if (global.WordscendEngine.addLetter(key)) {
           this.renderGrid();
-          if (window.WordscendApp_onStateChange) {
-            window.WordscendApp_onStateChange({ type: 'letter' });
-          }
+          global.WordscendApp_onStateChange?.({ type: 'letter' });
         }
         return;
       }
       if (key === 'Backspace') {
         if (global.WordscendEngine.backspace()) {
           this.renderGrid();
-          if (window.WordscendApp_onStateChange) {
-            window.WordscendApp_onStateChange({ type: 'backspace' });
-          }
+          global.WordscendApp_onStateChange?.({ type: 'backspace' });
         }
         return;
       }
@@ -411,23 +377,23 @@
           setTimeout(() => this.renderGrid(), 420 + (this.config.cols - 1) * 80);
         }
         if (res.ok) {
-          if (window.WordscendApp_onStateChange) {
-            window.WordscendApp_onStateChange({ type: 'submit', result: res });
-          }
+          global.WordscendApp_onStateChange?.({ type: 'submit', result: res });
         }
+        return;
       }
     },
 
     /* ---------- Hint UX ---------- */
+    _answerMeta: null,
     setAnswerMeta(answer, meta){
       this._answerMeta = { answer, meta };
-      if (!this._hintBtn && this.stageEl){
+      if (!this._hintBtn){
         const btn = document.createElement('button');
         btn.className = 'ws-btn';
         btn.textContent = 'Show Hint';
         btn.style.marginTop = '6px';
         btn.addEventListener('click', () => this.requestHintFlow(), { passive:true });
-        this.stageEl.prepend(btn);
+        this.stageEl?.prepend(btn);
         this._hintBtn = btn;
       }
     },
@@ -444,17 +410,15 @@
         if (!ok) return;
         try {
           if (typeof this.onHintConsume === 'function') this.onHintConsume();
-        } catch(e){}
-        const meta = (this._answerMeta && this._answerMeta.meta) || {};
+        } catch {}
+        const meta = this._answerMeta?.meta || {};
         const hintText = (meta && meta.hint) ? String(meta.hint) : 'No hint available for this word.';
         this.showHintToast(hintText);
       });
     },
 
     showHintToast(text){
-      // Remove any existing toast first
-      const existing = document.querySelector('.ws-streak-toast');
-      if (existing) existing.remove();
+      document.querySelector('.ws-streak-toast')?.remove();
 
       const t = document.createElement('div');
       t.className = 'ws-streak-toast show';
@@ -475,9 +439,7 @@
     },
 
     showConfirm(title, message, cb){
-      const existing = document.querySelector('.ws-modal');
-      if (existing) existing.remove();
-
+      document.querySelector('.ws-modal')?.remove();
       const wrap = document.createElement('div');
       wrap.className = 'ws-modal';
       wrap.innerHTML = `
@@ -506,8 +468,7 @@
     },
 
     showAnchoredTip(anchorEl, title, text){
-      const existing = document.querySelector('.ws-streak-tip');
-      if (existing) existing.remove();
+      document.querySelector('.ws-streak-tip')?.remove();
       if (!anchorEl) return;
       const r = anchorEl.getBoundingClientRect();
       const tip = document.createElement('div');
@@ -525,7 +486,6 @@
 
     /* ---------- Animations & Helpers ---------- */
     flipRevealRow(rowIndex, marks) {
-      if (!this.gridEl) return;
       const rows = this.gridEl.querySelectorAll('.ws-row');
       const rowEl = rows[rowIndex];
       if (!rowEl) return;
@@ -556,7 +516,6 @@
     },
 
     shakeCurrentRow() {
-      if (!this.gridEl || !global.WordscendEngine) return;
       const cursor = global.WordscendEngine.getCursor();
       const rows = this.gridEl.querySelectorAll('.ws-row');
       const rowEl = rows[cursor.row];
@@ -570,11 +529,11 @@
       if (!this.bubble) return;
       this.bubble.textContent = msg;
       this.bubble.classList.add('show');
-      if (this._bT) clearTimeout(this._bT);
+      clearTimeout(this._bT);
       this._bT = setTimeout(() => this.bubble.classList.remove('show'), 1400);
     },
 
-    floatPointsFromTile(tileEl, delta, color){
+    floatPointsFromTile(tileEl, delta, color='green'){
       try{
         const scoreEl = this.scoreEl;
         if (!tileEl || !scoreEl) return;
@@ -583,14 +542,14 @@
         const sRect = scoreEl.getBoundingClientRect();
 
         const chip = document.createElement('div');
-        chip.className = `ws-fxfloat ${color === 'green' ? 'green' : 'yellow'}`;
+        chip.className = `ws-fxfloat ${color==='green' ? 'green' : 'yellow'}`;
         chip.textContent = (delta > 0 ? `+${delta}` : `${delta}`);
         chip.style.left = `${tRect.left + tRect.width/2}px`;
         chip.style.top  = `${tRect.top  + tRect.height/2}px`;
         chip.style.transform = 'translate(-50%, -50%) scale(1)';
         document.body.appendChild(chip);
 
-        requestAnimationFrame(()=> {
+        requestAnimationFrame(()=>{
           const midX = (tRect.left + sRect.left)/2;
           const midY = Math.min(tRect.top, sRect.top) - 40;
 
@@ -599,7 +558,7 @@
           chip.style.top  = `${midY}px`;
           chip.style.transform = 'translate(-50%, -50%) scale(1.05)';
 
-          setTimeout(()=> {
+          setTimeout(()=>{
             chip.style.left = `${sRect.left + sRect.width/2}px`;
             chip.style.top  = `${sRect.top  + sRect.height/2}px`;
             chip.style.transform = 'translate(-50%, -50%) scale(0.8)';
@@ -607,7 +566,7 @@
           }, 160);
         });
 
-        setTimeout(()=> {
+        setTimeout(()=>{
           chip.remove();
           if (typeof window.WordscendApp_addScore === 'function') {
             window.WordscendApp_addScore(delta);
@@ -616,20 +575,43 @@
           scoreEl.classList.add('pulse');
           setTimeout(()=>scoreEl.classList.remove('pulse'), 260);
         }, 480);
-      }catch(e){}
+      }catch{}
     },
 
-    showEndCard(score, streakCurrent = 0, streakBest = 0) {
-      const existing = document.querySelector('.ws-endcard');
-      if (existing) existing.remove();
+    showEndCard(score, streakCurrent = 0, streakBest = 0, extraMeta = {}) {
+      document.querySelector('.ws-endcard')?.remove();
 
       const wrap = document.createElement('div');
       wrap.className = 'ws-endcard';
+
+      const answer = extraMeta.answer || null;
+      const def = extraMeta.meta?.definition || null;
+
+      let defHtml = '';
+      if (answer) {
+        const safeAns = String(answer).toUpperCase();
+        if (def) {
+          defHtml = `
+            <div class="ws-answer-def">
+              <div class="ws-answer-word">${safeAns}</div>
+              <div class="ws-answer-def-text">${def}</div>
+            </div>
+          `;
+        } else {
+          defHtml = `
+            <div class="ws-answer-def">
+              <div class="ws-answer-word">${safeAns}</div>
+            </div>
+          `;
+        }
+      }
+
       wrap.innerHTML = `
         <div class="card">
           <h3>Daily WordHive Complete 🎉</h3>
           <p>Your total score: <strong>${score}</strong></p>
           <p>Streak: <strong>${streakCurrent}</strong> day(s) • Best: <strong>${streakBest}</strong></p>
+          ${defHtml}
           <div class="row">
             <button class="ws-btn primary" data-action="share">Share Score</button>
             <button class="ws-btn" data-action="copy">Copy Score</button>
@@ -647,14 +629,14 @@
         if (act === 'close') wrap.remove();
         if (act === 'copy') {
           try { await navigator.clipboard.writeText(shareText); btn.textContent = 'Copied!'; }
-          catch(e) { btn.textContent = 'Copy failed'; }
+          catch { btn.textContent = 'Copy failed'; }
         }
         if (act === 'share') {
           if (navigator.share) {
-            try { await navigator.share({ text: shareText }); } catch(e){}
+            try { await navigator.share({ text: shareText }); } catch{}
           } else {
             try { await navigator.clipboard.writeText(shareText); btn.textContent = 'Copied!'; }
-            catch(e) { btn.textContent = 'Share not supported'; }
+            catch { btn.textContent = 'Share not supported'; }
           }
         }
       }, { passive:true });
@@ -664,8 +646,7 @@
 
     /* ---------- Modals ---------- */
     showRulesModal() {
-      const existing = document.querySelector('.ws-modal');
-      if (existing) existing.remove();
+      document.querySelector('.ws-modal')?.remove();
       const wrap = document.createElement('div');
       wrap.className = 'ws-modal';
 
@@ -682,7 +663,7 @@
       wrap.innerHTML = `
         <div class="card" role="dialog" aria-label="How to play WordHive">
           <h3>How to Play 🧩</h3>
-          <p>Climb through <strong>4 levels</strong> of daily word puzzles — from 4-letter to 7-letter words. You have <strong>6 tries</strong> per level.</p>
+          <p>Climb through <strong>4 levels</strong> of daily WordHive puzzles — from 4-letter to 7-letter words. You have <strong>6 tries</strong> per level.</p>
           <ul style="margin:6px 0 0 18px; color:var(--muted); line-height:1.5;">
             <li>Type or tap to guess a word of the current length.</li>
             <li>Tiles turn <strong>green</strong> (correct spot) or <strong>yellow</strong> (in word, wrong spot).</li>
@@ -698,15 +679,13 @@
 
       document.body.appendChild(wrap);
       wrap.addEventListener('click', (e)=>{
-        const btn = e.target;
-        if ((btn && btn.dataset && btn.dataset.action === 'close') || e.target === wrap) wrap.remove();
+        if (e.target.dataset.action === 'close' || e.target === wrap) wrap.remove();
       }, { passive:true });
       window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ wrap.remove(); }}, { once:true });
     },
 
     showSettingsModal() {
-      const existing = document.querySelector('.ws-modal');
-      if (existing) existing.remove();
+      document.querySelector('.ws-modal')?.remove();
       const wrap = document.createElement('div');
       wrap.className = 'ws-modal';
 
@@ -740,18 +719,19 @@
 
       wrap.addEventListener('click', (e)=>{
         const btn = e.target.closest('button[data-action]');
-        if (!btn) { if (e.target === wrap) wrap.remove(); return; }
+        if (!btn) {
+          if (e.target === wrap) wrap.remove();
+          return;
+        }
         const act = btn.dataset.action;
         if (act === 'save'){
-          const themeSel = wrap.querySelector('#ws-theme');
-          const soundEl  = wrap.querySelector('#ws-sound');
-          const theme = themeSel ? themeSel.value : 'dark';
-          const s = soundEl ? soundEl.checked : true;
+          const theme = wrap.querySelector('#ws-theme').value;
+          const s = wrap.querySelector('#ws-sound').checked;
           try {
             Theme.setPref(theme);
             Theme.apply(theme);
             localStorage.setItem('ws_sound', s ? '1':'0');
-          } catch(e){}
+          } catch {}
           btn.textContent='Saved';
           setTimeout(()=>wrap.remove(), 420);
         }
