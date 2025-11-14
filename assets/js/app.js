@@ -22,13 +22,14 @@
   function getParams() {
     const p = new URLSearchParams(location.search);
     return {
-      level: p.get('level'),
-      endcard: p.get('endcard'),
-      score: p.get('score'),
-      reset: p.get('reset'),
-      intro: p.get('intro'),
+      level:    p.get('level'),
+      endcard:  p.get('endcard'),
+      score:    p.get('score'),
+      reset:    p.get('reset'),
+      intro:    p.get('intro'),
       settings: p.get('settings'),
-      hints: p.get('hints')
+      hints:    p.get('hints'),
+      hint:     p.get('hint')
     };
   }
 
@@ -75,7 +76,7 @@
         current: 0, best: 0, lastPlayDay: null, markedToday: false,
         milestones:[3,7,14,30,50,100], lastMilestoneShown:0,
         available:0, earnedMonths:[], usedDays:[], toastDayShown:null,
-        // Hint bank earned via streak
+        // NEW: hint bank earned via streak
         hintsAvailable: 0,
         hintEarnedDays: [] // y-m-d dates when a hint was granted (to avoid double-earn on reload)
       },
@@ -94,7 +95,7 @@
     if (!Array.isArray(st.earnedMonths)) st.earnedMonths = [];
     if (!Array.isArray(st.usedDays)) st.usedDays = [];
     st.toastDayShown = st.toastDayShown || null;
-    // Hint bank
+    // NEW (hint bank)
     st.hintsAvailable = Number(st.hintsAvailable || 0);
     if (!Array.isArray(st.hintEarnedDays)) st.hintEarnedDays = [];
     return st;
@@ -139,7 +140,7 @@
     if (st.markedToday && last === today) return { changed:false };
 
     let usedFreeze=false, earnedFreeze=false, newBest=false, milestone=null;
-    let earnedHint=false;
+    let earnedHint=false; // NEW
 
     if (last === today) {
       st.markedToday = true;
@@ -158,13 +159,13 @@
 
     if ((st.current || 0) > (st.best || 0)) { st.best = st.current; newBest = true; }
 
-    // Freeze earn rule: earn 1 per month after reaching day 7 of that month
+    // Freeze earn rule (unchanged): earn 1 per month after reaching day 7 of that month
     if (st.current >= 7) {
       const mk = monthKey(today);
       if (!st.earnedMonths.includes(mk)) { st.earnedMonths.push(mk); st.available += 1; earnedFreeze = true; }
     }
 
-    // Hint earn rule – earn 1 hint each time the current streak hits a multiple of 5
+    // NEW: Hint earn rule – earn 1 hint each time the current streak hits a multiple of 5
     if (st.current > 0 && st.current % 5 === 0) {
       if (!st.hintEarnedDays.includes(today)) {
         st.hintsAvailable += 1;
@@ -189,47 +190,29 @@
     return `ws_hint_used_${todayKey()}_${len}`;
   }
 
-  // Clear all per-day/per-length "hint used" flags (useful for reset/testing)
-  function clearHintUsageFlags() {
-    try {
-      const prefix = 'ws_hint_used_';
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(prefix)) {
-          localStorage.removeItem(key);
-          i--; // adjust index since length shrinks
-        }
-      }
-    } catch {
-      // ignore storage errors
-    }
-  }
-
   function applyUrlOverrides(store) {
     const q = getParams();
 
-    // Hard reset: clear store + hint usage flags
+    // Reset everything
     if (q.reset === '1') {
-      clearHintUsageFlags();
       const fresh = defaultStore();
       saveStore(fresh);
       return fresh;
     }
 
-    // Level override (?level=1..4)
+    // Override level (?level=1..4)
     const lvl = q.level ? parseInt(q.level, 10) : NaN;
     if (!isNaN(lvl) && lvl >= 1 && lvl <= 4) {
       store.levelIndex = lvl - 1;
     }
 
-    // Hints override (?hints=99) for testing
-    if (q.hints) {
-      const hv = parseInt(q.hints, 10);
-      if (!isNaN(hv) && hv >= 0) {
+    // Debug: override hint bank (?hints=99 or ?hint=99)
+    const hintParam = q.hints ?? q.hint;
+    if (hintParam != null) {
+      const hv = parseInt(hintParam, 10);
+      if (!isNaN(hv)) {
         store.streak = migrateStreak(store.streak);
         store.streak.hintsAvailable = hv;
-        // Also clear per-day hint-use flags so all levels can spend them
-        clearHintUsageFlags();
       }
     }
 
@@ -248,7 +231,7 @@
     try {
       const d = Number(delta || 0);
       if (!isFinite(d) || d === 0) return;
-      // Allow negative score
+      // Allow negative score (requested)
       store.score = (store.score || 0) + d;
       saveStore(store);
       if (window.WordscendUI) {
@@ -269,6 +252,8 @@
   };
 
   (async () => {
+    // --- keep BASE as the wordhive repo ---
+
     // Helpers to build robust relative fallbacks
     function here(path) {
       const base = location.pathname.replace(/\/[^/]*$/, '/'); // directory of current page
@@ -365,7 +350,7 @@
       // Pass hintsAvailable to HUD
       window.WordscendUI.setHUD(`Level ${idx+1}/4`, store.score, store.streak.current, store.streak.hintsAvailable);
 
-      // Hint UX hooks
+      // Hook Hint UX
       window.WordscendUI.onHintCheck?.(() => canUseHintForLen(levelLen));
       window.WordscendUI.onHintConsume?.(() => {
         useHintForLen(levelLen);
