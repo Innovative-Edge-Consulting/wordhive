@@ -112,13 +112,11 @@
         const bg = document.createElement('div'); bg.className='ws-page-bg'; document.body.appendChild(bg);
       }
 
-      // NOTE: update src path to match where you placed the logo in your repo
-      // e.g. "assets/img/wordhive-logo.png"
       this.root.innerHTML = `
         <div class="ws-topbar">
           <div class="ws-topbar-inner">
             <div class="ws-brand" role="banner" aria-label="WordHive">
-              <img src="assets/img/wordhive-logo.png" alt="WordHive" class="ws-logo" />
+              <img src="wordhive-logo.png" alt="WordHive" class="ws-logo" />
             </div>
             <div class="ws-actions">
               <button class="icon-btn" id="ws-info" type="button" title="How to play" aria-label="How to play">
