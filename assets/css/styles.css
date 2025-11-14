@@ -28,7 +28,7 @@
 
 /* Light theme overrides */
 :root[data-theme="light"]{
-  --bg:#ffffff;
+  --bg:#f6f7f9;
   --text:#0b0d0f;
   --muted:#5c636a;
   --border:#d5d9df;
@@ -77,37 +77,10 @@ body{
   display:flex; align-items:center; justify-content:space-between; gap:12px;
 }
 .ws-brand{
-  display:flex; align-items:center; gap:6px;
+  display:flex; align-items:center; gap:10px;
   font:800 18px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
   letter-spacing:.3px;
 }
-
-/* Brand blocks for "W" and "H" tiles */
-.ws-brand-block{
-  width:28px;
-  height:28px;
-  border-radius:8px;
-  display:grid;
-  place-items:center;
-  font-weight:800;
-  font-size:18px;
-  background:var(--tile);
-  color:var(--text);
-  box-shadow:0 2px 4px rgba(0,0,0,.25);
-}
-.ws-brand-block-w{
-  background:#497f64;
-  color:#ffffff;
-}
-.ws-brand-block-h{
-  background:#e3b341;
-  color:#000000;
-}
-.ws-brand-text{
-  font-weight:800;
-  font-size:18px;
-}
-
 .ws-brand .dot{ width:10px; height:10px; border-radius:50%; background:var(--brand); display:inline-block }
 
 .ws-actions{ display:flex; align-items:center; gap:8px; }
@@ -181,13 +154,29 @@ body{
 .ws-row.shake .ws-tile{ animation:ws-shake 120ms linear 0s 2; }
 
 /* ===================== KEYBOARD ===================== */
+/* Centered, responsive keyboard */
 .ws-kb{
-  margin-top:8px; display:grid; gap:8px; width:100%; padding:0 12px;
-  -webkit-tap-highlight-color: transparent;
+  margin-top:8px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  width:100%;
+  padding:0 12px;
+  -webkit-tap-highlight-color:transparent;
   max-width:min(560px, calc(var(--tileSize) * var(--ws-cols, 5) + 8px * (var(--ws-cols, 5) - 1) + 48px));
-  margin-left:auto; margin-right:auto;
+  margin-left:auto;
+  margin-right:auto;
+  align-items:center; /* keeps rows centered under grid */
 }
-.ws-kb-row{ display:grid; grid-auto-flow:column; justify-content:center; gap:6px; }
+
+.ws-kb-row{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:6px;
+  width:100%;
+}
+
 .ws-kb-key{
   font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
   padding:12px 10px; min-width:34px; border-radius:8px;
@@ -325,19 +314,13 @@ body{
   .ws-kb{
     padding:0 8px;
     gap:10px;
-    justify-items:center;
   }
 
   .ws-kb-row{
     gap:6px;
-    width:auto;
-    grid-auto-flow:column;
     justify-content:center;
-    justify-items:center;
+    flex-wrap:nowrap;
   }
-  .ws-kb-row:nth-child(1){ grid-template-columns: repeat(10, auto); }
-  .ws-kb-row:nth-child(2){ grid-template-columns: repeat(9,  auto); }
-  .ws-kb-row:nth-child(3){ grid-template-columns: repeat(11, auto); }
 
   .ws-kb-key{
     justify-self:center; min-width:auto; min-height:clamp(40px, 9.8vw, 50px);
