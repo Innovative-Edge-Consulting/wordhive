@@ -109,7 +109,9 @@
       Theme.apply(Theme.getPref());
 
       if (!document.querySelector('.ws-page-bg')){
-        const bg = document.createElement('div'); bg.className='ws-page-bg'; document.body.appendChild(bg);
+        const bg = document.createElement('div');
+        bg.className='ws-page-bg';
+        document.body.appendChild(bg);
       }
 
       this.root.innerHTML = `
@@ -128,7 +130,7 @@
               <button class="icon-btn" id="ws-settings" type="button" title="Settings" aria-label="Settings">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <path
-                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.89 3.31.876 2.42 2.42a1.724 1.724 0 0 0 1.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.89 1.543-.876 3.31-2.42 2.42a1.724 1.724 0 0 0-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.89-3.31-.876-2.42-2.42a1.724 1.724 0 0 0-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.89-1.543.876-3.31 2.42-2.42c.996.574 2.273.097 2.573-1.065Z"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.89 3.31.876 2.42 2.42a1.724 1.724 0 0 0 1.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.89 1.543-.876 3.31-2.42 2.42a1.724 1.724 0 0 0-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.89-3.31-.876-2.42-2.42a1.724 1.724 0 0 0-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.89-1.543.876-3.31 2.42-2.42.996.574 2.273.097 2.573-1.065Z"
                     stroke="currentColor"
                     stroke-width="1.5"
                     stroke-linecap="round"
@@ -443,10 +445,22 @@
       document.body.appendChild(wrap);
       const handler = (e) => {
         const btn = e.target.closest('button[data-action]');
-        if (!btn) { if (e.target === wrap) { cb && cb(false); wrap.remove(); } return; }
+        if (!btn) {
+          if (e.target === wrap) {
+            cb && cb(false);
+            wrap.remove();
+          }
+          return;
+        }
         const act = btn.dataset.action;
-        if (act === 'ok'){ cb && cb(true); wrap.remove(); }
-        if (act === 'cancel'){ cb && cb(false); wrap.remove(); }
+        if (act === 'ok'){
+          cb && cb(true);
+          wrap.remove();
+        }
+        if (act === 'cancel'){
+          cb && cb(false);
+          wrap.remove();
+        }
       };
       wrap.addEventListener('click', handler, { passive:true });
       window.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ cb && cb(false); wrap.remove(); }}, { once:true });
@@ -527,15 +541,15 @@
         const sRect = scoreEl.getBoundingClientRect();
 
         const chip = document.createElement('div');
-        chip.className = `ws-fxfloat ${color === 'green' ? 'green' : 'yellow'}`;
+        chip.className = `ws-fxfloat ${color==='green' ? 'green' : 'yellow'}`;
         chip.textContent = (delta > 0 ? `+${delta}` : `${delta}`);
-        chip.style.left = `${tRect.left + tRect.width / 2}px`;
-        chip.style.top  = `${tRect.top  + tRect.height / 2}px`;
+        chip.style.left = `${tRect.left + tRect.width/2}px`;
+        chip.style.top  = `${tRect.top  + tRect.height/2}px`;
         chip.style.transform = 'translate(-50%, -50%) scale(1)';
         document.body.appendChild(chip);
 
         requestAnimationFrame(()=>{
-          const midX = (tRect.left + sRect.left) / 2;
+          const midX = (tRect.left + sRect.left)/2;
           const midY = Math.min(tRect.top, sRect.top) - 40;
 
           chip.style.transitionTimingFunction = 'cubic-bezier(.22,.82,.25,1)';
@@ -544,8 +558,8 @@
           chip.style.transform = 'translate(-50%, -50%) scale(1.05)';
 
           setTimeout(()=>{
-            chip.style.left = `${sRect.left + sRect.width / 2}px`;
-            chip.style.top  = `${sRect.top  + sRect.height / 2}px`;
+            chip.style.left = `${sRect.left + sRect.width/2}px`;
+            chip.style.top  = `${sRect.top  + sRect.height/2}px`;
             chip.style.transform = 'translate(-50%, -50%) scale(0.8)';
             chip.style.opacity = '0.0';
           }, 160);
@@ -582,7 +596,7 @@
       `;
       document.body.appendChild(wrap);
 
-      const shareText = `I just finished today's Wordscend (4→7 letters) with ${score} points! Streak: ${streakCurrent} (best ${streakBest}).`;
+      const shareText = `I just finished today's WordHive (4→7 letters) with ${score} points! Streak: ${streakCurrent} (best ${streakBest}).`;
       wrap.addEventListener('click', async (e) => {
         const btn = e.target.closest('button[data-action]');
         if (!btn) return;
