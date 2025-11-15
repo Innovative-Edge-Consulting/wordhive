@@ -341,7 +341,6 @@
       if (this._kbClickBound || !this.kbEl) return;
       this._kbClickBound = true;
 
-      // Use 'click' for broad compatibility (mouse + touch)
       this.kbEl.addEventListener('click', (e) => {
         const btn = e.target.closest('.ws-kb-key');
         if (!btn) return;
@@ -559,7 +558,7 @@
         chip.textContent = (delta > 0 ? `+${delta}` : `${delta}`);
         chip.style.left = `${tRect.left + tRect.width/2}px`;
         chip.style.top  = `${tRect.top  + tRect.height/2}px`;
-        chip.style.transform = 'translate(-50%, -50%) scale(1)`;
+        chip.style.transform = 'translate(-50%, -50%) scale(1)';
         document.body.appendChild(chip);
 
         requestAnimationFrame(()=>{
@@ -569,12 +568,12 @@
           chip.style.transitionTimingFunction = 'cubic-bezier(.22,.82,.25,1)';
           chip.style.left = `${midX}px`;
           chip.style.top  = `${midY}px`;
-          chip.style.transform = 'translate(-50%, -50%) scale(1.05)`;
+          chip.style.transform = 'translate(-50%, -50%) scale(1.05)';
 
           setTimeout(()=>{
             chip.style.left = `${sRect.left + sRect.width/2}px`;
             chip.style.top  = `${sRect.top  + sRect.height/2}px`;
-            chip.style.transform = 'translate(-50%, -50%) scale(0.8)`;
+            chip.style.transform = 'translate(-50%, -50%) scale(0.8)';
             chip.style.opacity = '0.0';
           }, 160);
         });
@@ -598,7 +597,7 @@
       wrap.className = 'ws-endcard';
 
       const answer = extraMeta.answer || null;
-      const def = extraMeta.meta?.def || null; // FIX: use .def from Dictionary
+      const def = extraMeta.meta?.def || null;
 
       let defHtml = '';
       if (answer) {
