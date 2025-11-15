@@ -429,7 +429,7 @@ body{
   opacity:0.4;
 }
 
-.ws-helper-bubble{
+#ws-helper-bubble{
   pointer-events:none;
   max-width:220px;
   padding:8px 10px;
@@ -444,9 +444,33 @@ body{
   transition:opacity .18s ease, transform .18s ease;
 }
 
-.ws-helper:hover .ws-helper-bubble{
+#ws-helper:hover #ws-helper-bubble{
   opacity:1;
   transform:translateY(0);
+}
+
+.ws-helper-bubble.ws-helper-nudge{
+  position:absolute;
+  right:100%;
+  top:50%;
+  transform:translateY(-50%);
+  background:var(--card);
+  color:var(--text);
+  font:600 11px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  padding:6px 8px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  white-space:nowrap;
+  margin-right:6px;
+  opacity:0;
+  pointer-events:none;
+  box-shadow:var(--bubbleShadow);
+  transition:opacity .18s ease, transform .18s ease;
+}
+
+.ws-helper-bubble.ws-helper-nudge.show{
+  opacity:1;
+  transform:translateY(-50%) translateX(-2px);
 }
 
 /* On very small screens, keep Bee near the grid but tighter so it doesn't break layout */

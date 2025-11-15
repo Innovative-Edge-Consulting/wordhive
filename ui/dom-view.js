@@ -425,6 +425,9 @@
         if (!res.ok && res.reason === 'invalid') {
           this.shakeCurrentRow();
           this.showBubble('Not in word list');
+          if (typeof this.nudgeHelper === 'function') {
+            this.nudgeHelper('Buzz - need a hint?');
+          }
           return;
         }
 
@@ -581,6 +584,27 @@
       this.bubble.classList.add('show');
       clearTimeout(this._bT);
       this._bT = setTimeout(() => this.bubble.classList.remove('show'), 1400);
+    },
+
+    nudgeHelper(msg) {
+      try {
+        if (!this.helperEl) return;
+
+        let bubble = this.helperEl.querySelector('.ws-helper-bubble.ws-helper-nudge');
+        if (!bubble) {
+          bubble = document.createElement('div');
+          bubble.className = 'ws-helper-bubble ws-helper-nudge';
+          this.helperEl.appendChild(bubble);
+        }
+
+        bubble.textContent = msg || 'Buzz - need a hint?';
+        bubble.classList.add('show');
+
+        clearTimeout(this._helperBubbleTimer);
+        this._helperBubbleTimer = setTimeout(function () {
+          bubble.classList.remove('show');
+        }, 1800);
+      } catch (e) {}
     },
 
     floatPointsFromTile(tileEl, delta, color='green'){
