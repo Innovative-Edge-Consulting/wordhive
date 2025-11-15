@@ -265,15 +265,27 @@ body{
 
 /* ===================== STREAK TOAST ===================== */
 .ws-streak-toast{
-  position:fixed; left:50%; top:72px; transform:translate(-50%,-8px);
-  background:var(--card); color:var(--text); border:1px solid var(--border);
-  border-radius:12px; padding:10px 14px; font:700 14px/1.25 system-ui;
-  box-shadow:var(--bubbleShadow); z-index:55; opacity:0; pointer-events:none;
-  transition:opacity .2s ease, transform .2s ease;
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%, -50%);
+  background:var(--card);
+  color:var(--text);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px 18px;
+  font:700 14px/1.25 system-ui;
+  box-shadow:var(--bubbleShadow);
+  z-index:200;
+  opacity:0;
+  pointer-events:none;
+  max-width:90%;
+  text-align:center;
+  transition:opacity .25s ease, transform .25s ease;
 }
 .ws-streak-toast.show{
   opacity:1;
-  transform:translate(-50%,0);
+  transform:translate(-50%, -50%) scale(1);
   pointer-events:auto;
 }
 .ws-streak-toast .sub{ display:block; font:600 12px/1.2 system-ui; color:var(--muted); margin-top:4px; }
