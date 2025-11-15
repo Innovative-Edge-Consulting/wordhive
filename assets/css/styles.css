@@ -4,6 +4,9 @@
   --brand:#497f64;
   --ws-cols: 5;
 
+  /* Honeycomb line color (dark mode) */
+  --hive-line: rgba(73,127,100,0.25);
+
   /* Dark */
   --bg:#0d0f10;
   --text:#ffffff;
@@ -44,6 +47,9 @@
   --shadow: 0 10px 26px rgba(0,0,0,.08);
   --bubbleShadow: 0 8px 16px rgba(0,0,0,.10);
 
+  /* Honeycomb line color (light mode) */
+  --hive-line: rgba(73,127,100,0.18);
+  
 }
 
 :root[data-theme="dark"]{ --bg:#0d0f10; }
@@ -64,16 +70,35 @@ body{
   pointer-events:none;
   z-index:0;
 
-  /* Base background from theme */
+  /* Base theme background */
   background-color:var(--bg);
 
-  /* Optional very subtle vignette behind game (safe & non-busy) */
+  /* Subtle honeycomb made from fine green lines */
   background-image:
-    radial-gradient(circle at top center,
-      rgba(73,127,100,0.10),
-      transparent 60%
+    linear-gradient(30deg,
+      transparent 74%,
+      var(--hive-line) 75%,
+      var(--hive-line) 76%,
+      transparent 77%
+    ),
+    linear-gradient(150deg,
+      transparent 74%,
+      var(--hive-line) 75%,
+      var(--hive-line) 76%,
+      transparent 77%
+    ),
+    linear-gradient(90deg,
+      transparent 74%,
+      var(--hive-line) 75%,
+      var(--hive-line) 76%,
+      transparent 77%
     );
-  background-repeat:no-repeat;
+
+  /* Cell size: bigger = less busy */
+  background-size:64px 110px;
+  background-position:0 0, 0 0, 0 0;
+
+  background-repeat:repeat;
 }
 
 /* ===================== TOP BAR ===================== */
