@@ -433,7 +433,7 @@ body{
 .ws-helper{
   position:absolute;
   top:50%;
-  right:-52px;  /* tuned for desktop so the bee is near but not overlapping 7-letter rows */
+  right:-52px;  /* tuned so bee is close but not overlapping 7-letter rows on desktop */
   transform:translateY(-50%);
   z-index:80;
   width:44px;
@@ -478,16 +478,16 @@ body{
   opacity:0.4;
 }
 
+/* 🗨️ Hover speech bubble: "Hint Bee – you have {98} hints ready..." */
 .ws-helper-bubble{
   position:absolute;
-  display:inline-block;       /* <— key: let it size naturally horizontally */
   box-sizing:border-box;
+  display:inline-block;
 
-  /* Anchor bubble to the LEFT of the Bee, vertically centered */
-  top:50%;
-  right:100%;
-  left:auto;
-  transform:translate(-8px, -50%);
+  /* Position ABOVE the bee, centered horizontally */
+  bottom:100%;
+  left:50%;
+  transform:translate(-50%, -10px);
 
   background:#fff8d6;
   color:#5a4b20;
@@ -497,10 +497,12 @@ body{
   border:1px solid #e2d9a3;
   box-shadow:0 4px 12px rgba(0,0,0,0.18);
 
-  /* Make bubble reasonably wide so it doesn't wrap every word */
-  max-width:min(320px, 80vw);
+  /* Let it size naturally to text, within sensible bounds */
+  width:max-content;                 /* grow to fit text */
+  max-width:min(260px, 80vw);        /* but don’t get too wide */
+  min-width:140px;                   /* prevents super narrow “one word per line” */
   white-space:normal;
-  text-align:left;
+  text-align:center;
 
   opacity:0;
   pointer-events:none;
@@ -508,37 +510,34 @@ body{
   z-index:999;
 }
 
-/* Force children inline so they don't stack vertically word-by-word */
-.ws-helper-bubble *{
-  display:inline;
-  white-space:inherit;
-}
-
-#ws-helper:hover #ws-helper-bubble,
-#ws-helper-bubble.show{
-  opacity:1;
-  transform:translate(-8px, -50%) translateY(-4px);
-}
-
+/* Tooltip arrow pointing down at the bee */
 .ws-helper-bubble::after{
   content:"";
   position:absolute;
-  top:50%;
-  left:100%;
-  transform:translateY(-50%);
+  top:100%;
+  left:50%;
+  transform:translateX(-50%);
   width:0;
   height:0;
-  border-top:6px solid transparent;
-  border-bottom:6px solid transparent;
-  border-left:6px solid #fff8d6;
+  border-top:6px solid #fff8d6;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
   filter:drop-shadow(0 0 1px #e2d9a3);
 }
 
+/* Show on hover or when JS adds .show */
+#ws-helper:hover #ws-helper-bubble,
+#ws-helper-bubble.show{
+  opacity:1;
+  transform:translate(-50%, -14px);  /* small lift on show */
+}
+
+/* Mobile tweaks */
 @media (max-width:480px){
   .ws-helper-bubble{
     font-size:11px;
     padding:6px 10px;
-    max-width:78vw;   /* plenty of width, but not off-screen */
+    max-width:78vw;   /* wide enough to read, but stays on-screen */
   }
 }
 
