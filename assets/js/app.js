@@ -337,6 +337,9 @@
       normalizeLevelIndex(store);
       idx = store.levelIndex;
 
+      // Ensure any modal/transition locks are cleared when a new level loads
+      window.WordscendUI?.unlockInput?.();
+
       const levelLen = LEVEL_LENGTHS[idx];
 
       const curated = window.WordscendDictionary.answersOfLength(levelLen);

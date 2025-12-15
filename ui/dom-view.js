@@ -97,6 +97,7 @@
       if (!rootEl) return;
       this.root = rootEl;
       this.config = config || { rows:6, cols:5 };
+      this._inputLocked = false;
 
       const colCount = Number(this.config?.cols) || 5;
       try {
@@ -376,6 +377,7 @@
           return;
         }
 
+        if (this._inputLocked) return;
         this.handleInput(e.key);
       });
     },
@@ -390,11 +392,16 @@
         if (!btn) return;
         e.preventDefault();
         e.stopPropagation();
+        if (this._inputLocked) return;
         this.handleInput(btn.dataset.key);
       }, { passive: false });
     },
 
+    lockInput(){ this._inputLocked = true; },
+    unlockInput(){ this._inputLocked = false; },
+
     handleInput(key) {
+      if (this._inputLocked) return;
       if (/^[A-Za-z]$/.test(key)) {
         if (global.WordscendEngine.addLetter(key)) {
           this.renderGrid();
